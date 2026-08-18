@@ -23,14 +23,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayController.show()
     }
 
-    func applicationDidBecomeActive(_ notification: Notification) {
-        overlayController.reposition()
-    }
-
     private func menu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(withTitle: "Hide boxes", action: #selector(togglePlaceholders), keyEquivalent: "")
-        menu.addItem(withTitle: "Refresh placement baseline", action: #selector(refreshPlacementBaseline), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit TTALGAK", action: #selector(quit), keyEquivalent: "q")
         return menu
@@ -41,9 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu?.item(at: 0)?.title = overlayController.isVisible ? "Hide boxes" : "Show boxes"
     }
 
-    @objc private func refreshPlacementBaseline() {
-        overlayController.refreshPlacementBaseline()
-    }
 
     @objc private func quit() {
         NSApplication.shared.terminate(nil)
