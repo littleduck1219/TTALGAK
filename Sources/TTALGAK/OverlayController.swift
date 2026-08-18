@@ -4,7 +4,7 @@ final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
     private var panels: [PlaceholderPanel] = []
     private var screenParametersObserver: NSObjectProtocol?
-    private var visibleFrameTimer: Timer?
+    private var occlusionObservers: [NSObjectProtocol] = []
 
     init() {
         screenParametersObserver = NotificationCenter.default.addObserver(
@@ -17,7 +17,7 @@ final class OverlayController {
     }
 
     deinit {
-        visibleFrameTimer?.invalidate()
+        stopObservingPanelOcclusion()
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
         }
@@ -41,17 +41,27 @@ final class OverlayController {
             PlaceholderPanel(frame: .zero, label: "TTALGAK RIGHT")
         ]
         reposition()
-        startVisibleFrameObservation()
+        startObservingPanelOcclusion()
         panels.forEach { $0.orderFrontRegardless() }
     }
 
-    private func startVisibleFrameObservation() {
-        guard visibleFrameTimer == nil else { return }
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.reposition()
+    private func startObservingPanelOcclusion() {
+        guard occlusionObservers.isEmpty else { return }
+        occlusionObservers = panels.map { panel in
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification,
+                object: panel,
+                queue: .main
+            ) { [weak self] _ in
+                // Read geometry on the next main-loop turn after notification delivery.
+                DispatchQueue.main.async { self?.reposition() }
+            }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        visibleFrameTimer = timer
+    }
+
+    private func stopObservingPanelOcclusion() {
+        occlusionObservers.forEach(NotificationCenter.default.removeObserver)
+        occlusionObservers.removeAll()
     }
 
     func reposition() {
@@ -66,8 +76,7 @@ final class OverlayController {
     }
 
     func hide() {
-        visibleFrameTimer?.invalidate()
-        visibleFrameTimer = nil
+        stopObservingPanelOcclusion()
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
     }
