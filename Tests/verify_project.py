@@ -14,19 +14,22 @@ assert 'NSStatusBar.system.statusItem' in app
 assert source.count('PlaceholderPanel(frame:') == 2
 assert 'width: 180, height: 110' in source
 assert 'let screen = NSScreen.main' in source
-assert 'let visibleFrame = screen.visibleFrame' in source
-assert 'let bottomY = max(frame.minY, visibleFrame.minY)' in source
+assert 'func refreshPlacementBaseline()' in source
+assert 'baselineBottomInset = max(0, screen.visibleFrame.minY - frame.minY)' in source
+assert 'let inset = baselineScreenFrame == frame ? baselineBottomInset : 0' in source
+assert 'let bottomY = frame.minY + inset' in source
 assert 'x: frame.minX, y: bottomY' in source
 assert 'x: frame.maxX - boxSize.width, y: bottomY' in source
 assert 'NSApplication.didChangeScreenParametersNotification' in source
 assert 'func applicationDidBecomeActive' in app
 assert 'overlayController.reposition()' in app
-assert 'NSWindow.didChangeOcclusionStateNotification' in source
-assert 'DispatchQueue.main.async { self?.reposition() }' in source
+assert 'clearPlacementBaseline()' in source
+assert 'Refresh placement baseline' in app
+assert 'overlayController.refreshPlacementBaseline()' in app
+assert 'NSWindow.didChangeOcclusionStateNotification' not in source
 assert 'visibleFrameTimer' not in source
 assert 'Timer(' not in source
 assert 'RunLoop.main.add' not in source
-assert 'stopObservingPanelOcclusion()' in source
 assert '.borderless, .nonactivatingPanel' in source
 assert 'override var canBecomeKey: Bool { false }' in source
 assert 'No desktop-sized window' in source

@@ -4,7 +4,8 @@ final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
     private var panels: [PlaceholderPanel] = []
     private var screenParametersObserver: NSObjectProtocol?
-    private var occlusionObservers: [NSObjectProtocol] = []
+    private var baselineScreenFrame: NSRect?
+    private var baselineBottomInset: CGFloat = 0
 
     init() {
         screenParametersObserver = NotificationCenter.default.addObserver(
@@ -12,12 +13,12 @@ final class OverlayController {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            self?.clearPlacementBaseline()
             self?.reposition()
         }
     }
 
     deinit {
-        stopObservingPanelOcclusion()
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
         }
@@ -40,43 +41,36 @@ final class OverlayController {
             PlaceholderPanel(frame: .zero, label: "TTALGAK LEFT"),
             PlaceholderPanel(frame: .zero, label: "TTALGAK RIGHT")
         ]
-        reposition()
-        startObservingPanelOcclusion()
+        refreshPlacementBaseline()
         panels.forEach { $0.orderFrontRegardless() }
     }
 
-    private func startObservingPanelOcclusion() {
-        guard occlusionObservers.isEmpty else { return }
-        occlusionObservers = panels.map { panel in
-            NotificationCenter.default.addObserver(
-                forName: NSWindow.didChangeOcclusionStateNotification,
-                object: panel,
-                queue: .main
-            ) { [weak self] _ in
-                // Read geometry on the next main-loop turn after notification delivery.
-                DispatchQueue.main.async { self?.reposition() }
-            }
-        }
+    /// Samples the current public visible-frame bottom once; it does not observe Dock state.
+    func refreshPlacementBaseline() {
+        guard let screen = NSScreen.main else { return }
+        let frame = screen.frame
+        baselineScreenFrame = frame
+        baselineBottomInset = max(0, screen.visibleFrame.minY - frame.minY)
+        reposition()
     }
 
-    private func stopObservingPanelOcclusion() {
-        occlusionObservers.forEach(NotificationCenter.default.removeObserver)
-        occlusionObservers.removeAll()
+    private func clearPlacementBaseline() {
+        baselineScreenFrame = nil
+        baselineBottomInset = 0
     }
 
     func reposition() {
         guard panels.count == 2, let screen = NSScreen.main else { return }
         let frame = screen.frame
-        let visibleFrame = screen.visibleFrame
-        // Public-API policy: a visible bottom Dock raises visibleFrame.minY;
-        // when it no longer reserves space, frame.minY keeps boxes at the display edge.
-        let bottomY = max(frame.minY, visibleFrame.minY)
+        let inset = baselineScreenFrame == frame ? baselineBottomInset : 0
+        // ponytail: one snapshot per display geometry; add a Dock-specific public event only
+        // if macOS ships one. Dock changes require the explicit refresh action.
+        let bottomY = frame.minY + inset
         panels[0].setFrame(NSRect(x: frame.minX, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
         panels[1].setFrame(NSRect(x: frame.maxX - boxSize.width, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
     }
 
     func hide() {
-        stopObservingPanelOcclusion()
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
     }

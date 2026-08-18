@@ -1,13 +1,13 @@
 # TTALGAK macOS overlay-box prototype
 
-Native macOS menu-bar prototype: the primary display gets exactly two translucent `180 × 110 pt` AppKit panels at its lower-left and lower-right edges. Their X/size stay fixed; their Y follows the public `NSScreen.visibleFrame` bottom edge when a bottom Dock reserves space, otherwise the display bottom edge.
+Native macOS menu-bar prototype: the primary display gets exactly two translucent `180 × 110 pt` AppKit panels at its lower-left and lower-right edges. Their X/size stay fixed; their Y uses a user-session baseline sampled from the public `NSScreen.visibleFrame` while the bottom Dock is visible, and does not move when that Dock later auto-hides.
 
 ## Scope and privacy boundary
 
 - `NSApplication` runs as an accessory app with an AppKit menu-bar item.
-- `OverlayController` creates exactly two borderless, non-activating `NSPanel` windows. Their X positions and `180 × 110 pt` sizes use `NSScreen.main.frame`; their Y is `max(frame.minY, visibleFrame.minY)`, so a bottom Dock that reserves visible space lifts both boxes to its top and an auto-hidden Dock leaves them at the display edge.
-- It repositions on initial show, public screen-configuration notification, app activation, and each panel’s public `NSWindow.didChangeOcclusionStateNotification`. The occlusion callback defers one main-loop turn, then reuses the single `visibleFrame` geometry path; observers stop before panels hide or deinitialize. This replaces the rejected `Timer` polling path and adds no private Dock API, window/screen metadata, accessibility, capture, input monitoring, or permission.
-- Event boundary: `didChangeOcclusionStateNotification` is a panel-occlusion event, not a Dock-state event. The required Mac QA must confirm that the Dock hide/show transition changes these panels’ occlusion state and that the deferred read sees the new `visibleFrame`; if either event/frame boundary does not occur, the permitted API set has no guaranteed Dock-specific subscription and this implementation must not be marked as a Mac pass.
+- `OverlayController` creates exactly two borderless, non-activating `NSPanel` windows. On **Show boxes** and **Refresh placement baseline**, it snapshots `max(0, screen.visibleFrame.minY - screen.frame.minY)` and uses that value as Y for the current main-display geometry. Dock show/hide creates no observer and cannot move the panels; this removes the rejected Timer and panel-occlusion guesses.
+- The baseline is only valid for the same `NSScreen.main.frame`. A public screen-configuration notification clears it and temporarily places panels at the display bottom; use **Refresh placement baseline** with the intended bottom Dock visible after changing display, resolution, Dock size, or Dock position. A Dock on the left or right has zero bottom inset, so panels remain at the display bottom.
+- Public-API limit: if TTALGAK first samples while an auto-hidden bottom Dock is hidden, `visibleFrame` reports no bottom reservation and the app cannot infer the later Dock height. Open/show or refresh with the Dock visible. There is no public Dock-state subscription used or required by this policy.
 - The visible box is the only local pointer target. There is no TTALGAK window outside either box, so macOS routes every empty overlay-area click to the app beneath it.
 - The current boxes only consume their own clicks as future stickman hit areas. They do not read or generate keyboard input.
 - No screen/window/file/clipboard capture or access, Accessibility, Screen Recording, Input Monitoring, global event tap/shortcut, network client, analytics SDK, or external transmission exists in this source tree.
@@ -33,18 +33,19 @@ swift build
 swift run TTALGAK
 ```
 
-Xcode route: open `Package.swift`, choose the `TTALGAK` executable scheme and `My Mac`, then Run. The app is a menu-bar accessory app; use **Hide boxes**, **Show boxes**, and **Quit TTALGAK** from its icon menu.
+Xcode route: open `Package.swift`, choose the `TTALGAK` executable scheme and `My Mac`, then Run. The app is a menu-bar accessory app; use **Hide boxes**, **Show boxes**, **Refresh placement baseline**, and **Quit TTALGAK** from its icon menu.
 
 ## Mac verification procedure (required before release)
 
-1. In Xcode, set a breakpoint inside the `NSWindow.didChangeOcclusionStateNotification` observer closure in `OverlayController.startObservingPanelOcclusion()`, then launch the app and verify the TTALGAK menu-bar icon appears. Ignore notifications caused by initial panel ordering; the two Dock transitions below are the test events.
-2. With the bottom Dock visible, verify exactly two translucent panels appear at `(screen.minX, screen.visibleFrame.minY, 180, 110)` and `(screen.maxX - 180, screen.visibleFrame.minY, 180, 110)`, retaining their X positions and sizes. Enable Dock auto-hide, move it down, and verify the panel-occlusion callback followed by its next main-loop turn puts both panels at `screen.frame.minY`.
-3. Re-display the Dock without activating TTALGAK or changing display configuration. Verify the panel-occlusion callback occurs, its deferred read sees the current `screen.visibleFrame.minY`, and both panels return there with unchanged X and `180 × 110 pt` size. If no callback arrives or the frame is stale at that boundary, record FAIL; do not use elapsed time as a substitute and do not claim macOS coverage from Linux validation.
-4. Choose **Hide boxes** then **Show boxes** and verify both panels hide/show together.
-5. Place another normal app behind the gaps between and above the boxes. Click those empty regions; the underlying app must receive the click.
-6. Click inside each visible box; it may consume that local click but must not activate a normal TTALGAK window or install a global input hook.
-7. In System Settings → Privacy & Security, verify TTALGAK did not request Screen Recording, Accessibility, or Input Monitoring.
-8. Record multi-display, Space, and full-screen-app behavior separately. Do not mark those environments supported unless this run confirms the intended visibility and non-interference policy.
+1. Start with the bottom Dock visible, launch TTALGAK (or choose **Refresh placement baseline**), and verify exactly two translucent panels at `(screen.minX, screen.visibleFrame.minY, 180, 110)` and `(screen.maxX - 180, screen.visibleFrame.minY, 180, 110)`.
+2. Enable Dock auto-hide and hide/re-show the Dock without activating TTALGAK or changing display configuration. Both panels must retain the Y from step 1, with unchanged X and `180 × 110 pt` size. No Dock callback is expected or required.
+3. Change Dock size/position, resolution, or main display. The screen-configuration event clears the old baseline; with the intended bottom Dock visible, choose **Refresh placement baseline** and verify the new Y equals the new `screen.visibleFrame.minY`. For a left/right Dock, verify bottom Y equals `screen.frame.minY`.
+4. Launch or refresh while the auto-hidden Dock is hidden: verify Y is `screen.frame.minY`, then reveal the Dock and use **Refresh placement baseline** to establish its height. This is the documented public-API fallback, not an automatic Dock-state recovery.
+5. Choose **Hide boxes** then **Show boxes** and verify both panels hide/show together.
+6. Place another normal app behind the gaps between and above the boxes. Click those empty regions; the underlying app must receive the click.
+7. Click inside each visible box; it may consume that local click but must not activate a normal TTALGAK window or install a global input hook.
+8. In System Settings → Privacy & Security, verify TTALGAK did not request Screen Recording, Accessibility, or Input Monitoring.
+9. Record multi-display, Space, and full-screen-app behavior separately. Do not mark those environments supported unless this run confirms the intended visibility and non-interference policy.
 
 ## Linux static validation boundary
 
