@@ -30,6 +30,7 @@ private class PanelView: NSView {
 final class SpearThrowView: PanelView {
     enum Event { case press, release }
     var state = SpearGameState() { didSet { needsDisplay = true } }
+    var reducesMotion = false { didSet { needsDisplay = true } }
     private let onEvent: (Event) -> Void
 
     init(frame: NSRect, onEvent: @escaping (Event) -> Void) {
@@ -50,9 +51,10 @@ final class SpearThrowView: PanelView {
         case .hit: status = "명중"
         case .miss: status = "결과"
         }
-        drawText(status, at: NSPoint(x: 12, y: 84), weight: .semibold)
-        drawText("\(Int(state.angleDegrees.rounded()))°", at: NSPoint(x: 140, y: 82), size: 16, weight: .bold, color: blue)
-        drawStickman(at: NSPoint(x: 36, y: 45), angle: state.phase == .flying ? nil : state.angleDegrees)
+        let angle = presentationAngle
+        drawText(status, at: NSPoint(x: 12, y: 84), size: 16, weight: .bold)
+        drawText("\(Int(angle.rounded()))°", at: NSPoint(x: 140, y: 82), size: 16, weight: .bold, color: blue)
+        drawStickman(at: NSPoint(x: 36, y: 45), angle: state.phase == .flying ? nil : angle)
         drawTrack()
         if state.phase == .ready { drawText("누르고 각도를 고르세요", at: NSPoint(x: 12, y: 66), size: 12, weight: .medium) }
     }
@@ -75,16 +77,25 @@ final class SpearThrowView: PanelView {
     private func drawTrack() {
         let start = NSPoint(x: 12, y: 15), end = NSPoint(x: 168, y: 15)
         borderColor.setStroke(); let line = NSBezierPath(); line.move(to: start); line.line(to: end); line.lineWidth = 2; line.stroke()
-        let fraction = (state.angleDegrees - SpearGameState.lowAngle) / (SpearGameState.highAngle - SpearGameState.lowAngle)
+        let fraction = (presentationAngle - SpearGameState.lowAngle) / (SpearGameState.highAngle - SpearGameState.lowAngle)
         let x = start.x + (end.x - start.x) * fraction
         blue.setFill(); NSBezierPath(ovalIn: NSRect(x: x - 4, y: 11, width: 8, height: 8)).fill()
-        drawText("20°", at: NSPoint(x: 12, y: 2), size: 10)
-        drawText("70°", at: NSPoint(x: 148, y: 2), size: 10)
+        blue.setStroke(); let tick = NSBezierPath(); tick.move(to: NSPoint(x: x, y: 9)); tick.line(to: NSPoint(x: x, y: 21)); tick.lineWidth = 2; tick.stroke()
+        drawText("20°", at: NSPoint(x: 12, y: 2), size: 12)
+        drawText("70°", at: NSPoint(x: 144, y: 2), size: 12)
+    }
+
+    private var presentationAngle: Double {
+        guard state.phase == .aiming, !reducesMotion else { return state.angleDegrees }
+        let fraction = (state.angleDegrees - SpearGameState.lowAngle) / (SpearGameState.highAngle - SpearGameState.lowAngle)
+        let eased = fraction * fraction * (3 - 2 * fraction)
+        return SpearGameState.lowAngle + eased * (SpearGameState.highAngle - SpearGameState.lowAngle)
     }
 }
 
 final class TargetView: PanelView {
     var state = SpearGameState() { didSet { needsDisplay = true } }
+    var reducesMotion = false { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -112,17 +123,18 @@ final class TargetView: PanelView {
     }
 
     private func drawTarget(at point: NSPoint, active: Bool) {
-        let color = active ? textColor : borderColor
+        let alpha: CGFloat = active ? 1 : 0.4
+        let color = (active ? textColor : borderColor).withAlphaComponent(alpha)
         color.setStroke()
         for radius in [11.0, 7.0] { let p = NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)); p.lineWidth = active ? 2 : 1; p.stroke() }
-        (active ? yellow : borderColor).setFill(); NSBezierPath(ovalIn: NSRect(x: point.x - 3, y: point.y - 3, width: 6, height: 6)).fill()
+        (active ? yellow : borderColor).withAlphaComponent(alpha).setFill(); NSBezierPath(ovalIn: NSRect(x: point.x - 3, y: point.y - 3, width: 6, height: 6)).fill()
     }
 
     private func drawFlight(at point: NSPoint) {
         guard state.phase == .flying || state.phase == .hit || state.phase == .miss else { return }
         let landing = state.landingHeight ?? state.target.normalizedHeight
         let y = 25 + CGFloat(landing * 55)
-        let end = NSPoint(x: state.phase == .flying ? 112 : 126, y: y)
+        let end = NSPoint(x: !reducesMotion && state.phase == .flying ? 112 : 126, y: y)
         blue.setStroke(); let spear = NSBezierPath(); spear.move(to: NSPoint(x: 78, y: point.y)); spear.line(to: end); spear.lineWidth = 2; spear.lineCapStyle = .round; spear.stroke()
         blue.setFill(); NSBezierPath(ovalIn: NSRect(x: end.x - 2, y: end.y - 2, width: 4, height: 4)).fill()
     }

@@ -60,6 +60,13 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(game, flight)
     }
 
+    func testMotionPolicyKeepsCoreTimingSeparateFromReducedMotionRendering() {
+        XCTAssertEqual(MotionPolicy.standard.aimingUpdateInterval, 1.0 / 60.0, accuracy: 0.0001)
+        XCTAssertTrue(MotionPolicy.standard.showsFlightAnimation)
+        XCTAssertEqual(MotionPolicy.reducedMotion.aimingUpdateInterval, 0.3, accuracy: 0.0001)
+        XCTAssertFalse(MotionPolicy.reducedMotion.showsFlightAnimation)
+    }
+
     func testNormalizedMappingHitsEachTargetAndMissesOutsideTolerance() {
         for (target, angle) in [(TargetPosition.bottom, 20.0), (.middle, 45.0), (.top, 70.0)] {
             var game = SpearGameState(firstTarget: target)

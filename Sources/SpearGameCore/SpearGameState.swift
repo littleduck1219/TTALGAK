@@ -13,6 +13,15 @@ public enum AimDirection: Equatable {
     case decreasing
 }
 
+/// Renderer timing policy; game-state timing and judgement remain independent.
+public struct MotionPolicy: Equatable {
+    public let aimingUpdateInterval: Double
+    public let showsFlightAnimation: Bool
+
+    public static let standard = MotionPolicy(aimingUpdateInterval: 1.0 / 60.0, showsFlightAnimation: true)
+    public static let reducedMotion = MotionPolicy(aimingUpdateInterval: 0.3, showsFlightAnimation: false)
+}
+
 public enum TargetPosition: CaseIterable, Equatable {
     case bottom
     case middle

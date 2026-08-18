@@ -8,6 +8,7 @@ final class OverlayController {
     private var aimingTimer: Timer?
     private var flightTimer: Timer?
     private var resultTimer: Timer?
+    private var motionPolicy = MotionPolicy.standard
 
     var isVisible: Bool { !panels.isEmpty }
 
@@ -45,6 +46,7 @@ final class OverlayController {
     private func handle(_ event: SpearThrowView.Event) {
         switch event {
         case .press:
+            motionPolicy = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .reducedMotion : .standard
             game.beginAim()
             guard game.phase == .aiming else { return }
             startAiming()
@@ -53,16 +55,21 @@ final class OverlayController {
             game.release()
             guard wasAiming, game.phase == .flying else { return }
             aimingTimer?.invalidate()
-            flightTimer = Timer.scheduledTimer(withTimeInterval: 0.21, repeats: false) { [weak self] _ in self?.resolveFlight() }
+            if motionPolicy.showsFlightAnimation {
+                flightTimer = Timer.scheduledTimer(withTimeInterval: 0.21, repeats: false) { [weak self] _ in self?.resolveFlight() }
+            } else {
+                resolveFlight()
+            }
         }
         render()
     }
 
     private func startAiming() {
         aimingTimer?.invalidate()
-        aimingTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-            self?.game.advanceAim(by: 1.0 / 60.0)
-            self?.render()
+        aimingTimer = Timer.scheduledTimer(withTimeInterval: motionPolicy.aimingUpdateInterval, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.game.advanceAim(by: self.motionPolicy.aimingUpdateInterval)
+            self.render()
         }
     }
 
@@ -76,8 +83,11 @@ final class OverlayController {
     }
 
     private func render() {
+        let reducesMotion = !motionPolicy.showsFlightAnimation
         (panels.first?.contentView as? SpearThrowView)?.state = game
+        (panels.first?.contentView as? SpearThrowView)?.reducesMotion = reducesMotion
         (panels.last?.contentView as? TargetView)?.state = game
+        (panels.last?.contentView as? TargetView)?.reducesMotion = reducesMotion
     }
 
     private func stopTimers() {

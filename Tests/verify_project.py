@@ -30,6 +30,10 @@ assert 'override var canBecomeMain: Bool { false }' in overlay
 assert 'No desktop-sized window' in overlay
 assert 'SpearThrowView' in overlay and 'TargetView' in overlay
 assert 'Timer.scheduledTimer(withTimeInterval: 0.21' in overlay
+assert 'accessibilityDisplayShouldReduceMotion' in overlay
+assert '.reducedMotion' in overlay
+assert 'motionPolicy.aimingUpdateInterval' in overlay
+assert 'if motionPolicy.showsFlightAnimation' in overlay
 assert 'Timer.scheduledTimer(withTimeInterval: 1.0' in overlay
 for removed in ('visibleFrame', 'baseline', 'Refresh placement baseline', 'refreshPlacementBaseline', 'didChangeScreenParametersNotification', 'NSWindow.didChangeOcclusionStateNotification'):
     assert removed not in overlay
@@ -37,10 +41,11 @@ assert '20.0' in core and '70.0' in core and '1.2' in core
 assert 'normalizedLanding' in core and 'hitTolerance' in core
 assert 'guard phase == .aiming else { return }' in core
 assert 'guard phase == .flying, let landingHeight else { return }' in core
-for expected in ('testReadyAimingFlyingHitReadyAddsOnePoint', 'testReadyAimingFlyingMissReadyKeepsScore', 'testAimReversesAtBothBounds', 'testInvalidInputIsNoOpAndReleaseOnlyStartsOneFlight', 'testNormalizedMappingHitsEachTargetAndMissesOutsideTolerance'):
+for expected in ('testReadyAimingFlyingHitReadyAddsOnePoint', 'testReadyAimingFlyingMissReadyKeepsScore', 'testAimReversesAtBothBounds', 'testInvalidInputIsNoOpAndReleaseOnlyStartsOneFlight', 'testMotionPolicyKeepsCoreTimingSeparateFromReducedMotionRendering', 'testNormalizedMappingHitsEachTargetAndMissesOutsideTolerance'):
     assert expected in tests
-for expected in ('누르고 각도를 고르세요', '과녁', '✓ 딸깍!', '× 아쉽다', 'acceptsFirstMouse', 'mouseDown', 'mouseUp'):
+for expected in ('누르고 각도를 고르세요', '과녁', '✓ 딸깍!', '× 아쉽다', 'acceptsFirstMouse', 'mouseDown', 'mouseUp', 'size: 16, weight: .bold', 'let tick = NSBezierPath()', 'size: 12', 'presentationAngle', 'let alpha: CGFloat = active ? 1 : 0.4', 'reducesMotion'):
     assert expected in view
+assert 'MotionPolicy' in core and 'aimingUpdateInterval: 0.3' in core and 'showsFlightAnimation: false' in core
 for forbidden in ('ScreenCaptureKit', 'CGWindowList', 'AXUIElement', 'CGEventTap', 'CGEventPost', 'URLSession', 'NSPasteboard', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'CGRequestScreenCaptureAccess'):
     assert forbidden not in all_source
 assert 'Required Mac QA' in readme
