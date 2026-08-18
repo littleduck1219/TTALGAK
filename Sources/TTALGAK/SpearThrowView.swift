@@ -16,7 +16,7 @@ private func drawText(_ text: String, at point: NSPoint, size: CGFloat = 12, wei
     NSAttributedString(string: text, attributes: [.font: font(size, weight), .foregroundColor: color]).draw(at: point)
 }
 
-private class PanelView: NSView {
+class PanelView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.white.withAlphaComponent(0.94).setFill()
         NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()

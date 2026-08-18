@@ -29,6 +29,9 @@ assert 'override var canBecomeKey: Bool { false }' in overlay
 assert 'override var canBecomeMain: Bool { false }' in overlay
 assert 'No desktop-sized window' in overlay
 assert 'SpearThrowView' in overlay and 'TargetView' in overlay
+assert 'class PanelView: NSView' in view
+assert 'private class PanelView: NSView' not in view
+assert 'fileprivate class PanelView: NSView' not in view
 assert 'Timer.scheduledTimer(withTimeInterval: 0.21' in overlay
 assert 'accessibilityDisplayShouldReduceMotion' in overlay
 assert '.reducedMotion' in overlay

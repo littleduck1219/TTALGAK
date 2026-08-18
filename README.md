@@ -68,3 +68,20 @@ swift test  # only when a Swift toolchain is installed
 ```
 
 A Linux static pass is not a macOS runtime pass. It does not certify Swift/AppKit compilation, rendering, press/hold/release, pointer capture, focus retention, click-through, reduced-motion behavior, typography collision, or permission behavior.
+
+## Swift access-control recovery and required Mac acceptance
+
+The reported Mac compile failure came from internal `SpearThrowView`/`TargetView` inheriting `private PanelView`. `PanelView` now has internal default access, matching those subclasses. `Tests/verify_project.py` rejects a private or fileprivate `PanelView` superclass while retaining the existing safety assertions.
+
+After GitHub delivery, the representative must run and return output for:
+
+```bash
+cd /Users/littleduck/Documents/GitHub/TTALGAK
+git pull --ff-only origin main
+swift package describe
+swift test
+swift build
+swift run TTALGAK
+```
+
+Until that output is returned, macOS compile and runtime acceptance remain pending; Linux static checks are not a replacement.
