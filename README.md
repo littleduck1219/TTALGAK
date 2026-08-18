@@ -37,7 +37,7 @@ Xcode route: open `Package.swift`, choose the `TTALGAK` executable scheme and `M
 
 ## Mac verification procedure (required before release)
 
-1. On the primary display, launch the app and verify the TTALGAK menu-bar icon appears.
+1. In Xcode, set a breakpoint inside the `NSWindow.didChangeOcclusionStateNotification` observer closure in `OverlayController.startObservingPanelOcclusion()`, then launch the app and verify the TTALGAK menu-bar icon appears. Ignore notifications caused by initial panel ordering; the two Dock transitions below are the test events.
 2. With the bottom Dock visible, verify exactly two translucent panels appear at `(screen.minX, screen.visibleFrame.minY, 180, 110)` and `(screen.maxX - 180, screen.visibleFrame.minY, 180, 110)`, retaining their X positions and sizes. Enable Dock auto-hide, move it down, and verify the panel-occlusion callback followed by its next main-loop turn puts both panels at `screen.frame.minY`.
 3. Re-display the Dock without activating TTALGAK or changing display configuration. Verify the panel-occlusion callback occurs, its deferred read sees the current `screen.visibleFrame.minY`, and both panels return there with unchanged X and `180 × 110 pt` size. If no callback arrives or the frame is stale at that boundary, record FAIL; do not use elapsed time as a substitute and do not claim macOS coverage from Linux validation.
 4. Choose **Hide boxes** then **Show boxes** and verify both panels hide/show together.
