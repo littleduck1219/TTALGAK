@@ -1,26 +1,28 @@
 import AppKit
+import SpearGameCore
 
 final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
-    private var panels: [PlaceholderPanel] = []
+    private var panels: [GamePanel] = []
+    private var game = SpearGameState()
+    private var aimingTimer: Timer?
+    private var flightTimer: Timer?
+    private var resultTimer: Timer?
 
     var isVisible: Bool { !panels.isEmpty }
 
-    func toggle() {
-        isVisible ? hide() : show()
-    }
+    func toggle() { isVisible ? hide() : show() }
 
     func show() {
-        guard panels.isEmpty else {
-            reposition()
-            return
-        }
-        // Two bounded transparent panels are the overlay. No desktop-sized window
-        // exists, so every empty point belongs to the app below it.
-        panels = [
-            PlaceholderPanel(frame: .zero, label: "TTALGAK LEFT"),
-            PlaceholderPanel(frame: .zero, label: "TTALGAK RIGHT")
-        ]
+        guard panels.isEmpty else { reposition(); return }
+        // No desktop-sized window exists: points outside these panels remain owned by the app below.
+        let left = GamePanel(frame: .zero)
+        let right = GamePanel(frame: .zero)
+        let leftView = SpearThrowView(frame: .zero) { [weak self] event in self?.handle(event) }
+        left.contentView = leftView
+        right.contentView = TargetView(frame: .zero)
+        panels = [left, right]
+        render()
         reposition()
         panels.forEach { $0.orderFrontRegardless() }
     }
@@ -35,64 +37,66 @@ final class OverlayController {
     }
 
     func hide() {
+        stopTimers()
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
     }
+
+    private func handle(_ event: SpearThrowView.Event) {
+        switch event {
+        case .press:
+            game.beginAim()
+            guard game.phase == .aiming else { return }
+            startAiming()
+        case .release:
+            let wasAiming = game.phase == .aiming
+            game.release()
+            guard wasAiming, game.phase == .flying else { return }
+            aimingTimer?.invalidate()
+            flightTimer = Timer.scheduledTimer(withTimeInterval: 0.21, repeats: false) { [weak self] _ in self?.resolveFlight() }
+        }
+        render()
+    }
+
+    private func startAiming() {
+        aimingTimer?.invalidate()
+        aimingTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            self?.game.advanceAim(by: 1.0 / 60.0)
+            self?.render()
+        }
+    }
+
+    private func resolveFlight() {
+        game.resolveFlight()
+        render()
+        resultTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+            self?.game.finishRound()
+            self?.render()
+        }
+    }
+
+    private func render() {
+        (panels.first?.contentView as? SpearThrowView)?.state = game
+        (panels.last?.contentView as? TargetView)?.state = game
+    }
+
+    private func stopTimers() {
+        [aimingTimer, flightTimer, resultTimer].forEach { $0?.invalidate() }
+        aimingTimer = nil; flightTimer = nil; resultTimer = nil
+    }
 }
 
-private final class PlaceholderPanel: NSPanel {
-    init(frame: NSRect, label: String) {
-        super.init(
-            contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
+private final class GamePanel: NSPanel {
+    init(frame: NSRect) {
+        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary]
         ignoresMouseEvents = false
-        contentView = PlaceholderBoxView(frame: NSRect(origin: .zero, size: frame.size), label: label)
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
-}
-
-/// Input policy: only these two bounded 180x110pt panels receive mouse events.
-/// There is deliberately no full-screen overlay window, so every point outside
-/// the visible boxes is owned by the underlying application and clicks pass through.
-private final class PlaceholderBoxView: NSView {
-    private let label: String
-
-    init(frame: NSRect, label: String) {
-        self.label = label
-        super.init(frame: frame)
-    }
-
-    required init?(coder: NSCoder) { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.systemTeal.withAlphaComponent(0.32).setFill()
-        NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12).fill()
-        NSColor.white.withAlphaComponent(0.72).setStroke()
-        let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 12, yRadius: 12)
-        border.lineWidth = 1
-        border.stroke()
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white.withAlphaComponent(0.9),
-            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium)
-        ]
-        let text = NSAttributedString(string: label, attributes: attributes)
-        let size = text.size()
-        text.draw(at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2))
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        // Placeholder policy: consume clicks inside the visible box only.
-        // Future stickman hit-testing must shrink this to the character shape.
-    }
 }

@@ -12,4 +12,5 @@ __pycache__/
 /AGENTS.md
 /docs/ai/
 /.claude/
+/.hermes/
 /.codex/
