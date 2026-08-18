@@ -3,6 +3,23 @@ import AppKit
 final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
     private var panels: [PlaceholderPanel] = []
+    private var screenParametersObserver: NSObjectProtocol?
+
+    init() {
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reposition()
+        }
+    }
+
+    deinit {
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
+    }
 
     var isVisible: Bool { !panels.isEmpty }
 
@@ -11,14 +28,29 @@ final class OverlayController {
     }
 
     func show() {
-        guard panels.isEmpty, let screen = NSScreen.main else { return }
-        let frame = screen.frame
+        guard panels.isEmpty else {
+            reposition()
+            return
+        }
         // Two bounded transparent panels are the overlay. No desktop-sized window
         // exists, so every empty point belongs to the app below it.
-        let left = NSRect(x: frame.minX, y: frame.minY, width: boxSize.width, height: boxSize.height)
-        let right = NSRect(x: frame.maxX - boxSize.width, y: frame.minY, width: boxSize.width, height: boxSize.height)
-        panels = [PlaceholderPanel(frame: left, label: "TTALGAK LEFT"), PlaceholderPanel(frame: right, label: "TTALGAK RIGHT")]
+        panels = [
+            PlaceholderPanel(frame: .zero, label: "TTALGAK LEFT"),
+            PlaceholderPanel(frame: .zero, label: "TTALGAK RIGHT")
+        ]
+        reposition()
         panels.forEach { $0.orderFrontRegardless() }
+    }
+
+    func reposition() {
+        guard panels.count == 2, let screen = NSScreen.main else { return }
+        let frame = screen.frame
+        let visibleFrame = screen.visibleFrame
+        // Public-API policy: a visible bottom Dock raises visibleFrame.minY;
+        // when it no longer reserves space, frame.minY keeps boxes at the display edge.
+        let bottomY = max(frame.minY, visibleFrame.minY)
+        panels[0].setFrame(NSRect(x: frame.minX, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
+        panels[1].setFrame(NSRect(x: frame.maxX - boxSize.width, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
     }
 
     func hide() {

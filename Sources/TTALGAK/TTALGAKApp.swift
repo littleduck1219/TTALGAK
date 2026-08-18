@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overlayController.show()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        overlayController.reposition()
+    }
+
     private func menu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(withTitle: "Hide boxes", action: #selector(togglePlaceholders), keyEquivalent: "")

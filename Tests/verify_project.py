@@ -14,8 +14,13 @@ assert 'NSStatusBar.system.statusItem' in app
 assert source.count('PlaceholderPanel(frame:') == 2
 assert 'width: 180, height: 110' in source
 assert 'let screen = NSScreen.main' in source
-assert 'x: frame.minX, y: frame.minY' in source
-assert 'x: frame.maxX - boxSize.width, y: frame.minY' in source
+assert 'let visibleFrame = screen.visibleFrame' in source
+assert 'let bottomY = max(frame.minY, visibleFrame.minY)' in source
+assert 'x: frame.minX, y: bottomY' in source
+assert 'x: frame.maxX - boxSize.width, y: bottomY' in source
+assert 'NSApplication.didChangeScreenParametersNotification' in source
+assert 'func applicationDidBecomeActive' in app
+assert 'overlayController.reposition()' in app
 assert '.borderless, .nonactivatingPanel' in source
 assert 'override var canBecomeKey: Bool { false }' in source
 assert 'No desktop-sized window' in source

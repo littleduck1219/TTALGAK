@@ -1,11 +1,12 @@
 # TTALGAK macOS overlay-box prototype
 
-Native macOS menu-bar prototype: the primary display gets exactly two translucent `180 × 110 pt` AppKit panels at its lower-left and lower-right edges.
+Native macOS menu-bar prototype: the primary display gets exactly two translucent `180 × 110 pt` AppKit panels at its lower-left and lower-right edges. Their X/size stay fixed; their Y follows the public `NSScreen.visibleFrame` bottom edge when a bottom Dock reserves space, otherwise the display bottom edge.
 
 ## Scope and privacy boundary
 
 - `NSApplication` runs as an accessory app with an AppKit menu-bar item.
-- `OverlayController` creates exactly two borderless, non-activating `NSPanel` windows. The panels are the transparent overlay; there is intentionally no display-sized transparent window.
+- `OverlayController` creates exactly two borderless, non-activating `NSPanel` windows. Their X positions and `180 × 110 pt` sizes use `NSScreen.main.frame`; their Y is `max(frame.minY, visibleFrame.minY)`, so a bottom Dock that reserves visible space lifts both boxes to its top and an auto-hidden Dock leaves them at the display edge.
+- It repositions only on the public screen-configuration notification and app activation, plus initial show. There is no public Dock-state/height event guarantee, so the app does not poll or use private APIs, window/screen metadata, accessibility, capture, or permissions; a Dock animation without either trigger may remain at its last valid public-frame position until the next trigger.
 - The visible box is the only local pointer target. There is no TTALGAK window outside either box, so macOS routes every empty overlay-area click to the app beneath it.
 - The current boxes only consume their own clicks as future stickman hit areas. They do not read or generate keyboard input.
 - No screen/window/file/clipboard capture or access, Accessibility, Screen Recording, Input Monitoring, global event tap/shortcut, network client, analytics SDK, or external transmission exists in this source tree.
@@ -36,12 +37,13 @@ Xcode route: open `Package.swift`, choose the `TTALGAK` executable scheme and `M
 ## Mac verification procedure (required before release)
 
 1. On the primary display, launch the app and verify the TTALGAK menu-bar icon appears.
-2. Verify exactly two translucent panels appear: left frame `(screen.minX, screen.minY, 180, 110)` and right frame `(screen.maxX - 180, screen.minY, 180, 110)`.
-3. Choose **Hide boxes** then **Show boxes** and verify both panels hide/show together.
-4. Place another normal app behind the gaps between and above the boxes. Click those empty regions; the underlying app must receive the click.
-5. Click inside each visible box; it may consume that local click but must not activate a normal TTALGAK window or install a global input hook.
-6. In System Settings → Privacy & Security, verify TTALGAK did not request Screen Recording, Accessibility, or Input Monitoring.
-7. Record multi-display, Space, and full-screen-app behavior separately. Do not mark those environments supported unless this run confirms the intended visibility and non-interference policy.
+2. With the bottom Dock visible, verify exactly two translucent panels appear at `(screen.minX, screen.visibleFrame.minY, 180, 110)` and `(screen.maxX - 180, screen.visibleFrame.minY, 180, 110)`, retaining their X positions and sizes. Enable Dock auto-hide, move it down, trigger app activation, and verify both panels move to `screen.frame.minY`.
+3. Change display configuration or activate TTALGAK again and verify both panels recalculate from the current public frame. A Dock transition that produces neither trigger is an explicit unsupported immediacy guarantee; record the observed behavior rather than adding polling or private/system-observation APIs.
+4. Choose **Hide boxes** then **Show boxes** and verify both panels hide/show together.
+5. Place another normal app behind the gaps between and above the boxes. Click those empty regions; the underlying app must receive the click.
+6. Click inside each visible box; it may consume that local click but must not activate a normal TTALGAK window or install a global input hook.
+7. In System Settings → Privacy & Security, verify TTALGAK did not request Screen Recording, Accessibility, or Input Monitoring.
+8. Record multi-display, Space, and full-screen-app behavior separately. Do not mark those environments supported unless this run confirms the intended visibility and non-interference policy.
 
 ## Linux static validation boundary
 
