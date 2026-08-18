@@ -4,6 +4,7 @@ final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
     private var panels: [PlaceholderPanel] = []
     private var screenParametersObserver: NSObjectProtocol?
+    private var visibleFrameTimer: Timer?
 
     init() {
         screenParametersObserver = NotificationCenter.default.addObserver(
@@ -16,6 +17,7 @@ final class OverlayController {
     }
 
     deinit {
+        visibleFrameTimer?.invalidate()
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
         }
@@ -39,7 +41,17 @@ final class OverlayController {
             PlaceholderPanel(frame: .zero, label: "TTALGAK RIGHT")
         ]
         reposition()
+        startVisibleFrameObservation()
         panels.forEach { $0.orderFrontRegardless() }
+    }
+
+    private func startVisibleFrameObservation() {
+        guard visibleFrameTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.reposition()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        visibleFrameTimer = timer
     }
 
     func reposition() {
@@ -54,6 +66,8 @@ final class OverlayController {
     }
 
     func hide() {
+        visibleFrameTimer?.invalidate()
+        visibleFrameTimer = nil
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
     }

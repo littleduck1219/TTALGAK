@@ -21,6 +21,9 @@ assert 'x: frame.maxX - boxSize.width, y: bottomY' in source
 assert 'NSApplication.didChangeScreenParametersNotification' in source
 assert 'func applicationDidBecomeActive' in app
 assert 'overlayController.reposition()' in app
+assert 'Timer(timeInterval: 0.25, repeats: true)' in source
+assert 'RunLoop.main.add(timer, forMode: .common)' in source
+assert 'visibleFrameTimer?.invalidate()' in source
 assert '.borderless, .nonactivatingPanel' in source
 assert 'override var canBecomeKey: Bool { false }' in source
 assert 'No desktop-sized window' in source
