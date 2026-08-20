@@ -11,6 +11,7 @@ final class SpearThrowView: NSView {
     enum Event { case press, release }
     var state = SpearGameState() { didSet { needsDisplay = true } }
     var pose = StickmanPose.ready { didSet { needsDisplay = true } }
+    var aimDegrees = 45.0 { didSet { needsDisplay = true } }
     private let onEvent: (Event) -> Void
 
     init(frame: NSRect, onEvent: @escaping (Event) -> Void) {
@@ -24,12 +25,14 @@ final class SpearThrowView: NSView {
     override func mouseUp(with event: NSEvent) { onEvent(.release) }
 
     override func draw(_ dirtyRect: NSRect) {
-        drawStickman(at: NSPoint(x: 52, y: 33), pose: pose)
+        drawStickman(geometry: geometry)
     }
 
-    var handPoint: NSPoint { NSPoint(x: 68, y: 49) }
+    var geometry: SpearPresentationGeometry { SpearPresentationGeometry(pose: pose, aimDegrees: aimDegrees) }
 
-    private func drawStickman(at origin: NSPoint, pose: StickmanPose) {
+    private func drawStickman(geometry: SpearPresentationGeometry) {
+        let origin = NSPoint(x: 52, y: 33)
+        let pose = geometry.pose
         charcoal.setStroke()
         let head = NSBezierPath(ovalIn: NSRect(x: origin.x - 6, y: origin.y + 30, width: 12, height: 12))
         head.lineWidth = 2; head.stroke()
@@ -38,23 +41,15 @@ final class SpearThrowView: NSView {
         body.move(to: NSPoint(x: origin.x, y: origin.y + 30)); body.line(to: NSPoint(x: origin.x + lean, y: origin.y + 10))
         body.move(to: NSPoint(x: origin.x + lean, y: origin.y + 10)); body.line(to: NSPoint(x: origin.x - 9, y: origin.y))
         body.move(to: NSPoint(x: origin.x + lean, y: origin.y + 10)); body.line(to: NSPoint(x: origin.x + 9, y: origin.y))
-        let shoulder = NSPoint(x: origin.x, y: origin.y + 23)
-        let hand: NSPoint
-        switch pose {
-        case .aiming: hand = NSPoint(x: origin.x - 15, y: origin.y + 25)
-        case .release: hand = NSPoint(x: origin.x + 18, y: origin.y + 25)
-        case .flying: hand = NSPoint(x: origin.x + 15, y: origin.y + 20)
-        default: hand = NSPoint(x: origin.x + 16, y: origin.y + 16)
-        }
+        let shoulder = NSPoint(x: CGFloat(geometry.shoulder.x), y: CGFloat(geometry.shoulder.y))
+        let hand = NSPoint(x: CGFloat(geometry.hand.x), y: CGFloat(geometry.hand.y))
         body.move(to: shoulder); body.line(to: hand)
         body.lineWidth = 2; body.lineCapStyle = .round; body.stroke()
         guard pose == .ready || pose == .aiming else { return }
-        let angle: CGFloat = pose == .aiming ? 0.9 : 0.45
-        drawSpear(from: hand, angle: angle, color: blue)
+        drawSpear(from: NSPoint(x: CGFloat(geometry.heldSpearOrigin.x), y: CGFloat(geometry.heldSpearOrigin.y)), to: NSPoint(x: CGFloat(geometry.heldSpearEnd.x), y: CGFloat(geometry.heldSpearEnd.y)), color: blue)
     }
 
-    private func drawSpear(from start: NSPoint, angle: CGFloat, color: NSColor) {
-        let end = NSPoint(x: start.x + cos(angle) * 36, y: start.y + sin(angle) * 36)
+    private func drawSpear(from start: NSPoint, to end: NSPoint, color: NSColor) {
         color.setStroke()
         let spear = NSBezierPath(); spear.move(to: start); spear.line(to: end); spear.lineWidth = 2; spear.lineCapStyle = .round; spear.stroke()
         let tip = NSBezierPath(); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 5, y: end.y - 3)); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 4, y: end.y + 4)); tip.lineWidth = 2; tip.stroke()

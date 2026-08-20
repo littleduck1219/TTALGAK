@@ -127,4 +127,30 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(lifecycle.phase, .cue)
         XCTAssertEqual(lifecycle.pose, .recovery)
     }
+
+    func testPresentationGeometryClampsCurrentAimToTheVisible25To65Sweep() {
+        let low = SpearPresentationGeometry(pose: .aiming, aimDegrees: 20)
+        let high = SpearPresentationGeometry(pose: .aiming, aimDegrees: 70)
+
+        XCTAssertEqual(low.aimDegrees, 25, accuracy: 0.0001)
+        XCTAssertEqual(high.aimDegrees, 65, accuracy: 0.0001)
+        XCTAssertNotEqual(low.hand, high.hand)
+        XCTAssertNotEqual(low.heldSpearEnd, high.heldSpearEnd)
+    }
+
+    func testReleaseGeometrySharesRenderedHandHeldSpearOriginAndFlightStart() {
+        let geometry = SpearPresentationGeometry(pose: .release, aimDegrees: 45)
+
+        XCTAssertEqual(geometry.hand, geometry.heldSpearOrigin)
+        XCTAssertEqual(geometry.hand, geometry.flightStart)
+    }
+
+    func testVisibilityOnlyFlightContractAndDisplayOnlyAnchorAreExplicit() {
+        XCTAssertEqual(FlightLayerContract.visibilityOnly, FlightLayerContract(
+            ignoresMouseEvents: true, canBecomeKey: false, canBecomeMain: false,
+            isNonactivating: true, usesExplicitAppearance: true, removesAtImpact: true
+        ))
+        XCTAssertEqual(AnchorInteraction.displayOnly.ignoresMouseEvents, true)
+        XCTAssertEqual(AnchorInteraction.input.ignoresMouseEvents, false)
+    }
 }

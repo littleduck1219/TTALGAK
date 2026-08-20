@@ -18,7 +18,7 @@ assert '.testTarget(name: "SpearGameCoreTests"' in package
 assert 'path: "Tests"' in package
 assert 'NSStatusBar.system.statusItem' in app
 assert 'width: 180, height: 110' in overlay
-assert overlay.count('GamePanel(frame: .zero)') == 2
+assert overlay.count('GamePanel(frame: .zero, interaction:') == 2
 assert 'let screen = NSScreen.main' in overlay
 assert 'let bottomSafeInset = min(max(frame.height * 0.08, 72), 120)' in overlay
 assert 'let bottomY = frame.minY + bottomSafeInset' in overlay
@@ -28,17 +28,30 @@ assert '.borderless, .nonactivatingPanel' in overlay
 assert overlay.count('override var canBecomeKey: Bool { false }') >= 2
 assert overlay.count('override var canBecomeMain: Bool { false }') >= 2
 assert 'FlightPanel' in overlay and 'FlightView' in overlay
-assert 'ignoresMouseEvents = true' in overlay
+assert 'ignoresMouseEvents = contract.ignoresMouseEvents' in overlay
 assert 'orderOut(nil)' in overlay and 'flightPanel = nil' in overlay
 assert 'convertToScreen' in overlay
 assert 'PresentationPolicy' in core and 'PresentationLifecycle' in core
+assert 'SpearPresentationGeometry' in core
+assert 'FlightLayerContract' in core
+assert 'AnchorInteraction' in overlay
+assert 'interaction: .input' in overlay and 'interaction: .displayOnly' in overlay
+assert 'ignoresMouseEvents = interaction.ignoresMouseEvents' in overlay
+assert 'let geometry = left.geometry' in overlay
+assert 'render()\n            startFlight()' in overlay
+assert 'origin: geometry.flightStart' in overlay
+assert 'var geometry: SpearPresentationGeometry' in view
+assert 'geometry.heldSpearOrigin' in view and 'geometry.heldSpearEnd' in view
+assert 'FlightLayerContract.visibilityOnly' in overlay
+assert 'appearance = NSAppearance(named: .aqua)' in overlay
+assert 'FlightLayerContract.visibilityOnly.removesAtImpact' in overlay
 assert 'aimingCycle: 0.6' in core and 'launchDuration: 0.12' in core
 assert 'flightDuration: 0.5' in core and 'resetDuration: 1.1' in core
 assert 'aimingCycle: 0.3' in core and 'showsFlightTranslation: false' in core
 assert 'normalizedLanding' in core and 'hitTolerance' in core
 assert 'guard phase == .aiming else { return }' in core
 assert 'guard phase == .flying, let landingHeight else { return }' in core
-for expected in ('testV2StandardPresentationPolicyMeetsMotionBudget', 'testV2ReducedMotionHasStaticResultWithoutFlightTranslation', 'testPresentationLifecycleUsesReleaseFlyingCueThenReady', 'testReducedMotionLifecycleResolvesImmediatelyToStaticCue'):
+for expected in ('testV2StandardPresentationPolicyMeetsMotionBudget', 'testV2ReducedMotionHasStaticResultWithoutFlightTranslation', 'testPresentationLifecycleUsesReleaseFlyingCueThenReady', 'testReducedMotionLifecycleResolvesImmediatelyToStaticCue', 'testPresentationGeometryClampsCurrentAimToTheVisible25To65Sweep', 'testReleaseGeometrySharesRenderedHandHeldSpearOriginAndFlightStart', 'testVisibilityOnlyFlightContractAndDisplayOnlyAnchorAreExplicit'):
     assert expected in tests
 for removed in ('roundedRect', 'borderColor', '날아가는 중', '각도 선택', '점', 'drawTrack', 'visibleFrame', 'baseline', 'Refresh placement baseline', 'refreshPlacementBaseline', 'didChangeScreenParametersNotification', 'NSWindow.didChangeOcclusionStateNotification'):
     assert removed not in all_source

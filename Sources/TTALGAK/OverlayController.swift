@@ -19,8 +19,8 @@ final class OverlayController {
 
     func show() {
         guard panels.isEmpty else { reposition(); return }
-        let left = GamePanel(frame: .zero)
-        let right = GamePanel(frame: .zero)
+        let left = GamePanel(frame: .zero, interaction: .input)
+        let right = GamePanel(frame: .zero, interaction: .displayOnly)
         left.contentView = SpearThrowView(frame: .zero) { [weak self] event in self?.handle(event) }
         right.contentView = TargetView(frame: .zero)
         panels = [left, right]
@@ -56,6 +56,7 @@ final class OverlayController {
             guard game.phase == .aiming else { return }
             game.release(); lifecycle.release(); aimingTimer?.invalidate()
             guard motionPolicy.showsFlightAnimation else { resolveFlight(); return }
+            render()
             startFlight()
         }
         render()
@@ -75,11 +76,12 @@ final class OverlayController {
               let left = panels.first?.contentView as? SpearThrowView,
               let target = panels.last?.contentView as? TargetView,
               let leftPanel = panels.first, let rightPanel = panels.last else { return }
-        let start = leftPanel.convertToScreen(NSRect(origin: left.handPoint, size: .zero)).origin
+        let geometry = left.geometry
+        let start = leftPanel.convertToScreen(NSRect(origin: geometry.flightStart.cgPoint, size: .zero)).origin
         let targetPoint = rightPanel.convertToScreen(NSRect(origin: target.targetPoint, size: .zero)).origin
         let hit = abs((game.landingHeight ?? 0.5) - game.target.normalizedHeight) <= SpearGameState.hitTolerance
         let end = hit ? targetPoint : NSPoint(x: targetPoint.x + 42, y: targetPoint.y + ((game.landingHeight ?? 0.5) > game.target.normalizedHeight ? 32 : -32))
-        let panel = FlightPanel(frame: screen.frame)
+        let panel = FlightPanel(frame: screen.frame, contract: .visibilityOnly)
         let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size))
         flight.start = NSPoint(x: start.x - screen.frame.minX, y: start.y - screen.frame.minY)
         flight.end = NSPoint(x: end.x - screen.frame.minX, y: end.y - screen.frame.minY)
@@ -116,6 +118,7 @@ final class OverlayController {
     }
 
     private func hideFlight() {
+        guard FlightLayerContract.visibilityOnly.removesAtImpact else { return }
         flightPanel?.orderOut(nil)
         flightPanel = nil
     }
@@ -123,6 +126,7 @@ final class OverlayController {
     private func render() {
         (panels.first?.contentView as? SpearThrowView)?.state = game
         (panels.first?.contentView as? SpearThrowView)?.pose = lifecycle.pose
+        (panels.first?.contentView as? SpearThrowView)?.aimDegrees = game.angleDegrees
         (panels.last?.contentView as? TargetView)?.state = game
     }
 
@@ -132,22 +136,27 @@ final class OverlayController {
     }
 }
 
+private extension PresentationPoint {
+    var cgPoint: NSPoint { NSPoint(x: CGFloat(x), y: CGFloat(y)) }
+}
+
 private final class GamePanel: NSPanel {
-    init(frame: NSRect) {
+    init(frame: NSRect, interaction: AnchorInteraction) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false; backgroundColor = .clear; hasShadow = false; level = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary]
-        ignoresMouseEvents = false
+        ignoresMouseEvents = interaction.ignoresMouseEvents
     }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
 private final class FlightPanel: NSPanel {
-    init(frame: NSRect) {
+    init(frame: NSRect, contract: FlightLayerContract) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isOpaque = false; backgroundColor = .clear; hasShadow = false; level = .floating
-        ignoresMouseEvents = true
+        ignoresMouseEvents = contract.ignoresMouseEvents
+        appearance = NSAppearance(named: .aqua)
     }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }

@@ -7,13 +7,16 @@ Native macOS 13+ menu-bar mini game. The primary display keeps exactly two trans
 - No visible panel/card surface: no fill, border, radius, shadow, status, angle, track, persistent score, or “flying” UI.
 - The pure `SpearGameCore` owns normalized deterministic hit/miss and score semantics. `PresentationPolicy`/`PresentationLifecycle` are pure visual timing only; trajectory never changes judgement.
 - Standard: aiming pose cycle 600 ms ease-in-out; launch 120 ms; screen-space flight 500 ms (within 420–620 ms; release→impact ≤700 ms); result cue/reset completes release→Ready in 1.1 s.
-- Stickman poses are Ready, Aiming arm-back/body lean, Release forward arm/body shift, Flying, and recovery. A release produces one detached spear from hand to target or deterministic miss endpoint.
+- Stickman poses are Ready, Aiming arm-back/body lean, Release forward arm/body shift, Flying, and recovery. Aiming derives its visible 25°↔65° sweep from the current game aim through one deterministic presentation geometry value; standard keeps the 600 ms policy and Reduced Motion keeps the 300 ms/no-translation contract.
+- The shared presentation geometry is the sole source of rendered arm/hand, held-spear origin/end, and FlightPanel start. A release produces exactly one detached spear from the rendered release hand to target or deterministic miss endpoint without a separate coordinate.
 - Hit shows target/check plus short `+1`; miss shows only endpoint/X. There is no persistent score.
 - Reduced Motion: 300 ms aiming step; no translation, arc, scale, body-shift, or fade trajectory. Release resolves to a static Hit/Miss cue; pure judgement and reset semantics remain.
 
 ## Visibility-only flight layer
 
-During standard release only, a temporary transparent primary-display `FlightPanel` renders the spear. It uses public AppKit and is `.borderless` + `.nonactivatingPanel`, `ignoresMouseEvents = true`, and cannot become key/main. The layer has no event handler, keyboard handler, or custom hit-test; it is ordered out and released at impact before the result cue.
+During standard release only, a temporary transparent primary-display `FlightPanel` renders the spear. It uses public AppKit and is `.borderless` + `.nonactivatingPanel`, `ignoresMouseEvents = true`, cannot become key/main, has explicit `.aqua` appearance, and is ordered out/released at impact. The pure `FlightLayerContract` and Linux static verifier guard this configuration; real AppKit routing remains Mac QA only.
+
+Left anchor is the sole `input` panel. Right anchor is an explicit `displayOnly` panel with window-level `ignoresMouseEvents = true`; it cannot consume click, drag, or text input. It remains visible, nonactivating, non-key, and non-main.
 
 This is explicit mouse-ignore click-through, not v1’s click-through-by-absence. During flight, desktop and underlying app click/button/text/drag input must still route below it. Left anchor local mouse down/up remains the only input. Right anchor and flight layer are visual-only.
 

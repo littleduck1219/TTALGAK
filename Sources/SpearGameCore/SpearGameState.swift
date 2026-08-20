@@ -38,6 +38,62 @@ public enum StickmanPose: Equatable {
     case recovery
 }
 
+public struct PresentationPoint: Equatable {
+    public let x: Double
+    public let y: Double
+}
+
+/// Single deterministic presentation source for arm, held spear, and launch origin.
+public struct SpearPresentationGeometry: Equatable {
+    public let pose: StickmanPose
+    public let aimDegrees: Double
+    public let shoulder: PresentationPoint
+    public let hand: PresentationPoint
+    public let heldSpearOrigin: PresentationPoint
+    public let heldSpearEnd: PresentationPoint
+    public let flightStart: PresentationPoint
+
+    public init(pose: StickmanPose, aimDegrees: Double) {
+        self.pose = pose
+        self.aimDegrees = min(max(aimDegrees, 25), 65)
+        shoulder = PresentationPoint(x: 52, y: 56)
+        let radians = self.aimDegrees * .pi / 180
+        switch pose {
+        case .aiming:
+            hand = PresentationPoint(x: shoulder.x - cos(radians) * 18, y: shoulder.y + sin(radians) * 18)
+        case .release, .flying, .recovery:
+            hand = PresentationPoint(x: shoulder.x + cos(radians) * 18, y: shoulder.y + sin(radians) * 18)
+        case .ready:
+            hand = PresentationPoint(x: 68, y: 49)
+        }
+        heldSpearOrigin = hand
+        heldSpearEnd = PresentationPoint(x: hand.x + cos(radians) * 36, y: hand.y + sin(radians) * 36)
+        flightStart = hand
+    }
+}
+
+public enum AnchorInteraction: Equatable {
+    case input
+    case displayOnly
+
+    public var ignoresMouseEvents: Bool { self == .displayOnly }
+}
+
+/// Pure contract mirrored by the AppKit-only FlightPanel configuration.
+public struct FlightLayerContract: Equatable {
+    public let ignoresMouseEvents: Bool
+    public let canBecomeKey: Bool
+    public let canBecomeMain: Bool
+    public let isNonactivating: Bool
+    public let usesExplicitAppearance: Bool
+    public let removesAtImpact: Bool
+
+    public static let visibilityOnly = FlightLayerContract(
+        ignoresMouseEvents: true, canBecomeKey: false, canBecomeMain: false,
+        isNonactivating: true, usesExplicitAppearance: true, removesAtImpact: true
+    )
+}
+
 /// Pure visual policy. It never changes normalized game judgement.
 public struct PresentationPolicy: Equatable {
     public let aimingCycle: Double
