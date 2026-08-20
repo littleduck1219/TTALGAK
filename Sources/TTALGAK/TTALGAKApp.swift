@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "rectangle.3.group", accessibilityDescription: "TTALGAK")
+        item.button?.image = NSImage(systemSymbolName: "figure.run", accessibilityDescription: "TTALGAK")
         item.menu = menu()
         statusItem = item
         overlayController.show()
@@ -25,19 +25,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func menu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Hide boxes", action: #selector(togglePlaceholders), keyEquivalent: "")
+        menu.addItem(withTitle: "Hide TTALGAK", action: #selector(toggleOverlay), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit TTALGAK", action: #selector(quit), keyEquivalent: "q")
         return menu
     }
 
-    @objc private func togglePlaceholders() {
+    @objc private func toggleOverlay() {
         overlayController.toggle()
-        statusItem?.menu?.item(at: 0)?.title = overlayController.isVisible ? "Hide boxes" : "Show boxes"
+        statusItem?.menu?.item(at: 0)?.title = overlayController.isVisible ? "Hide TTALGAK" : "Show TTALGAK"
     }
 
-
-    @objc private func quit() {
-        NSApplication.shared.terminate(nil)
-    }
+    @objc private func quit() { NSApplication.shared.terminate(nil) }
 }

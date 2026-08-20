@@ -25,32 +25,27 @@ assert 'let bottomY = frame.minY + bottomSafeInset' in overlay
 assert 'x: frame.minX, y: bottomY' in overlay
 assert 'x: frame.maxX - boxSize.width, y: bottomY' in overlay
 assert '.borderless, .nonactivatingPanel' in overlay
-assert 'override var canBecomeKey: Bool { false }' in overlay
-assert 'override var canBecomeMain: Bool { false }' in overlay
-assert 'No desktop-sized window' in overlay
-assert 'SpearThrowView' in overlay and 'TargetView' in overlay
-assert 'class PanelView: NSView' in view
-assert 'private class PanelView: NSView' not in view
-assert 'fileprivate class PanelView: NSView' not in view
-assert 'Timer.scheduledTimer(withTimeInterval: 0.21' in overlay
-assert 'accessibilityDisplayShouldReduceMotion' in overlay
-assert '.reducedMotion' in overlay
-assert 'motionPolicy.aimingUpdateInterval' in overlay
-assert 'if motionPolicy.showsFlightAnimation' in overlay
-assert 'Timer.scheduledTimer(withTimeInterval: 1.0' in overlay
-for removed in ('visibleFrame', 'baseline', 'Refresh placement baseline', 'refreshPlacementBaseline', 'didChangeScreenParametersNotification', 'NSWindow.didChangeOcclusionStateNotification'):
-    assert removed not in overlay
-assert '20.0' in core and '70.0' in core and '1.2' in core
+assert overlay.count('override var canBecomeKey: Bool { false }') >= 2
+assert overlay.count('override var canBecomeMain: Bool { false }') >= 2
+assert 'FlightPanel' in overlay and 'FlightView' in overlay
+assert 'ignoresMouseEvents = true' in overlay
+assert 'orderOut(nil)' in overlay and 'flightPanel = nil' in overlay
+assert 'convertToScreen' in overlay
+assert 'PresentationPolicy' in core and 'PresentationLifecycle' in core
+assert 'aimingCycle: 0.6' in core and 'launchDuration: 0.12' in core
+assert 'flightDuration: 0.5' in core and 'resetDuration: 1.1' in core
+assert 'aimingCycle: 0.3' in core and 'showsFlightTranslation: false' in core
 assert 'normalizedLanding' in core and 'hitTolerance' in core
 assert 'guard phase == .aiming else { return }' in core
 assert 'guard phase == .flying, let landingHeight else { return }' in core
-for expected in ('testReadyAimingFlyingHitReadyAddsOnePoint', 'testReadyAimingFlyingMissReadyKeepsScore', 'testAimReversesAtBothBounds', 'testInvalidInputIsNoOpAndReleaseOnlyStartsOneFlight', 'testMotionPolicyKeepsCoreTimingSeparateFromReducedMotionRendering', 'testNormalizedMappingHitsEachTargetAndMissesOutsideTolerance'):
+for expected in ('testV2StandardPresentationPolicyMeetsMotionBudget', 'testV2ReducedMotionHasStaticResultWithoutFlightTranslation', 'testPresentationLifecycleUsesReleaseFlyingCueThenReady', 'testReducedMotionLifecycleResolvesImmediatelyToStaticCue'):
     assert expected in tests
-for expected in ('누르고 각도를 고르세요', '과녁', '✓ 딸깍!', '× 아쉽다', 'acceptsFirstMouse', 'mouseDown', 'mouseUp', 'size: 16, weight: .bold', 'let tick = NSBezierPath()', 'size: 12', 'presentationAngle', 'let alpha: CGFloat = active ? 1 : 0.4', 'reducesMotion'):
-    assert expected in view
-assert 'MotionPolicy' in core and 'aimingUpdateInterval: 0.3' in core and 'showsFlightAnimation: false' in core
-for forbidden in ('ScreenCaptureKit', 'CGWindowList', 'AXUIElement', 'CGEventTap', 'CGEventPost', 'URLSession', 'NSPasteboard', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'CGRequestScreenCaptureAccess'):
+for removed in ('roundedRect', 'borderColor', '날아가는 중', '각도 선택', '점', 'drawTrack', 'visibleFrame', 'baseline', 'Refresh placement baseline', 'refreshPlacementBaseline', 'didChangeScreenParametersNotification', 'NSWindow.didChangeOcclusionStateNotification'):
+    assert removed not in all_source
+for expected in ('StickmanPose', 'drawStickman', 'drawTarget', 'mouseDown', 'mouseUp', 'acceptsFirstMouse', 'drawSpear'):
+    assert expected in all_source
+for forbidden in ('ScreenCaptureKit', 'CGWindowList', 'AXUIElement', 'CGEventTap', 'CGEventPost', 'URLSession', 'NSPasteboard', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'CGRequestScreenCaptureAccess', 'CGDisplayStream', 'CGWindowImage'):
     assert forbidden not in all_source
-assert 'Required Mac QA' in readme
+assert 'v2' in readme and 'visibility-only' in readme
 assert 'Linux static pass is not a macOS runtime pass' in readme
-print('PASS: TTALGAK v1 static scope, deterministic core, and overlay-policy checks')
+print('PASS: TTALGAK v2 static scope, pure presentation lifecycle, and visibility-only flight-layer checks')

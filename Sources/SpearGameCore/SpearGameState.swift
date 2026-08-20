@@ -22,6 +22,97 @@ public struct MotionPolicy: Equatable {
     public static let reducedMotion = MotionPolicy(aimingUpdateInterval: 0.3, showsFlightAnimation: false)
 }
 
+public enum PresentationPhase: Equatable {
+    case ready
+    case aiming
+    case release
+    case flying
+    case cue
+}
+
+public enum StickmanPose: Equatable {
+    case ready
+    case aiming
+    case release
+    case flying
+    case recovery
+}
+
+/// Pure visual policy. It never changes normalized game judgement.
+public struct PresentationPolicy: Equatable {
+    public let aimingCycle: Double
+    public let launchDuration: Double
+    public let flightDuration: Double
+    public let resetDuration: Double
+    public let showsFlightTranslation: Bool
+
+    public static let standard = PresentationPolicy(
+        aimingCycle: 0.6, launchDuration: 0.12, flightDuration: 0.5,
+        resetDuration: 1.1, showsFlightTranslation: true
+    )
+    public static let reducedMotion = PresentationPolicy(
+        aimingCycle: 0.3, launchDuration: 0, flightDuration: 0,
+        resetDuration: 1.1, showsFlightTranslation: false
+    )
+}
+
+/// Time-only presentation state; AppKit owns drawing and timers.
+public struct PresentationLifecycle: Equatable {
+    public private(set) var phase: PresentationPhase = .ready
+    public let policy: PresentationPolicy
+    private var elapsed = 0.0
+
+    public init(policy: PresentationPolicy) {
+        self.policy = policy
+    }
+
+    public var pose: StickmanPose {
+        switch phase {
+        case .ready: return .ready
+        case .aiming: return .aiming
+        case .release: return .release
+        case .flying: return .flying
+        case .cue: return .recovery
+        }
+    }
+
+    public mutating func beginAim() {
+        guard phase == .ready else { return }
+        phase = .aiming
+        elapsed = 0
+    }
+
+    public mutating func release() {
+        guard phase == .aiming else { return }
+        elapsed = 0
+        phase = policy.showsFlightTranslation ? .release : .cue
+    }
+
+    public mutating func advance(by seconds: Double) {
+        guard seconds > 0 else { return }
+        elapsed += seconds
+        switch phase {
+        case .release where elapsed >= policy.launchDuration:
+            phase = .flying
+            elapsed = 0
+        case .flying where elapsed >= policy.flightDuration:
+            phase = .cue
+            elapsed = 0
+        case .cue where elapsed >= cueDuration:
+            phase = .ready
+            elapsed = 0
+        default:
+            break
+        }
+    }
+
+    private var cueDuration: Double {
+        policy.showsFlightTranslation
+            ? policy.resetDuration - policy.launchDuration - policy.flightDuration
+            : policy.resetDuration
+    }
+}
+
 public enum TargetPosition: CaseIterable, Equatable {
     case bottom
     case middle

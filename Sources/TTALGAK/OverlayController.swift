@@ -4,27 +4,27 @@ import SpearGameCore
 final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
     private var panels: [GamePanel] = []
+    private var flightPanel: FlightPanel?
     private var game = SpearGameState()
+    private var lifecycle = PresentationLifecycle(policy: .standard)
     private var aimingTimer: Timer?
     private var flightTimer: Timer?
     private var resultTimer: Timer?
     private var motionPolicy = MotionPolicy.standard
+    private var presentationPolicy = PresentationPolicy.standard
+    private var flightElapsed = 0.0
 
     var isVisible: Bool { !panels.isEmpty }
-
     func toggle() { isVisible ? hide() : show() }
 
     func show() {
         guard panels.isEmpty else { reposition(); return }
-        // No desktop-sized window exists: points outside these panels remain owned by the app below.
         let left = GamePanel(frame: .zero)
         let right = GamePanel(frame: .zero)
-        let leftView = SpearThrowView(frame: .zero) { [weak self] event in self?.handle(event) }
-        left.contentView = leftView
+        left.contentView = SpearThrowView(frame: .zero) { [weak self] event in self?.handle(event) }
         right.contentView = TargetView(frame: .zero)
         panels = [left, right]
-        render()
-        reposition()
+        render(); reposition()
         panels.forEach { $0.orderFrontRegardless() }
     }
 
@@ -38,7 +38,7 @@ final class OverlayController {
     }
 
     func hide() {
-        stopTimers()
+        stopTimers(); hideFlight()
         panels.forEach { $0.orderOut(nil) }
         panels.removeAll()
     }
@@ -47,19 +47,16 @@ final class OverlayController {
         switch event {
         case .press:
             motionPolicy = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .reducedMotion : .standard
-            game.beginAim()
+            presentationPolicy = motionPolicy.showsFlightAnimation ? .standard : .reducedMotion
+            lifecycle = PresentationLifecycle(policy: presentationPolicy)
+            game.beginAim(); lifecycle.beginAim()
             guard game.phase == .aiming else { return }
             startAiming()
         case .release:
-            let wasAiming = game.phase == .aiming
-            game.release()
-            guard wasAiming, game.phase == .flying else { return }
-            aimingTimer?.invalidate()
-            if motionPolicy.showsFlightAnimation {
-                flightTimer = Timer.scheduledTimer(withTimeInterval: 0.21, repeats: false) { [weak self] _ in self?.resolveFlight() }
-            } else {
-                resolveFlight()
-            }
+            guard game.phase == .aiming else { return }
+            game.release(); lifecycle.release(); aimingTimer?.invalidate()
+            guard motionPolicy.showsFlightAnimation else { resolveFlight(); return }
+            startFlight()
         }
         render()
     }
@@ -73,21 +70,60 @@ final class OverlayController {
         }
     }
 
-    private func resolveFlight() {
-        game.resolveFlight()
+    private func startFlight() {
+        guard let screen = NSScreen.main,
+              let left = panels.first?.contentView as? SpearThrowView,
+              let target = panels.last?.contentView as? TargetView,
+              let leftPanel = panels.first, let rightPanel = panels.last else { return }
+        let start = leftPanel.convertToScreen(NSRect(origin: left.handPoint, size: .zero)).origin
+        let targetPoint = rightPanel.convertToScreen(NSRect(origin: target.targetPoint, size: .zero)).origin
+        let hit = abs((game.landingHeight ?? 0.5) - game.target.normalizedHeight) <= SpearGameState.hitTolerance
+        let end = hit ? targetPoint : NSPoint(x: targetPoint.x + 42, y: targetPoint.y + ((game.landingHeight ?? 0.5) > game.target.normalizedHeight ? 32 : -32))
+        let panel = FlightPanel(frame: screen.frame)
+        let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        flight.start = NSPoint(x: start.x - screen.frame.minX, y: start.y - screen.frame.minY)
+        flight.end = NSPoint(x: end.x - screen.frame.minX, y: end.y - screen.frame.minY)
+        panel.contentView = flight
+        flightPanel = panel
+        panel.orderFrontRegardless()
+        flightElapsed = 0
+        flightTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() }
+    }
+
+    private func advanceFlight() {
+        let step = 1.0 / 60.0
+        flightElapsed += step
+        lifecycle.advance(by: step)
+        if lifecycle.phase == .flying, let view = flightPanel?.contentView as? FlightView {
+            view.progress = CGFloat(min(1, max(0, (flightElapsed - presentationPolicy.launchDuration) / presentationPolicy.flightDuration)))
+        }
+        if flightElapsed >= presentationPolicy.launchDuration + presentationPolicy.flightDuration { resolveFlight() }
         render()
-        resultTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-            self?.game.finishRound()
-            self?.render()
+    }
+
+    private func resolveFlight() {
+        flightTimer?.invalidate(); flightTimer = nil; hideFlight()
+        game.resolveFlight(); render()
+        let cueDuration = presentationPolicy.showsFlightTranslation
+            ? presentationPolicy.resetDuration - presentationPolicy.launchDuration - presentationPolicy.flightDuration
+            : presentationPolicy.resetDuration
+        resultTimer = Timer.scheduledTimer(withTimeInterval: cueDuration, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.game.finishRound()
+            self.lifecycle = PresentationLifecycle(policy: self.presentationPolicy)
+            self.render()
         }
     }
 
+    private func hideFlight() {
+        flightPanel?.orderOut(nil)
+        flightPanel = nil
+    }
+
     private func render() {
-        let reducesMotion = !motionPolicy.showsFlightAnimation
         (panels.first?.contentView as? SpearThrowView)?.state = game
-        (panels.first?.contentView as? SpearThrowView)?.reducesMotion = reducesMotion
+        (panels.first?.contentView as? SpearThrowView)?.pose = lifecycle.pose
         (panels.last?.contentView as? TargetView)?.state = game
-        (panels.last?.contentView as? TargetView)?.reducesMotion = reducesMotion
     }
 
     private func stopTimers() {
@@ -99,14 +135,20 @@ final class OverlayController {
 private final class GamePanel: NSPanel {
     init(frame: NSRect) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        level = .floating
+        isOpaque = false; backgroundColor = .clear; hasShadow = false; level = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary]
         ignoresMouseEvents = false
     }
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
 
+private final class FlightPanel: NSPanel {
+    init(frame: NSRect) {
+        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isOpaque = false; backgroundColor = .clear; hasShadow = false; level = .floating
+        ignoresMouseEvents = true
+    }
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }

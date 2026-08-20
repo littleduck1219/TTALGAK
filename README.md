@@ -1,79 +1,34 @@
-# TTALGAK 창던지기 v1
+# TTALGAK 창던지기 v2
 
-Native macOS 13+ menu-bar mini game. The primary display has exactly two bounded `180 × 110 pt` AppKit nonactivating panels: left is local throw control; right is target/result only. Their X and size are fixed; Y is Dock-independent: `screen.frame.minY + clamp(screen.frame.height × 0.08, 72, 120)`.
+Native macOS 13+ menu-bar mini game. The primary display keeps exactly two transparent `180 × 110 pt` AppKit anchors: left is the only local press/hold/release surface and visually contains one stickman plus held spear; right is noninteractive and visually contains one target. Their X positions and app-owned Y inset are fixed: `screen.frame.minY + clamp(screen.frame.height × 0.08, 72, 120)`. Windows is out of scope.
 
-## Product loop
+## Product and motion contract
 
-- Hold the left panel: the pure core deterministically sweeps `20° → 70° → 20°` in 1.2 seconds low-to-high. Standard rendering presents that shared angle, marker, and spear with ease-in-out; judgement remains the core's normalized deterministic value.
-- Release once: only `Aiming` may enter `Flying`. Standard motion shows a right-panel-only 210 ms symbolic flight; Reduce Motion resolves directly to Hit/Miss without a flight animation.
-- macOS's public `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion` is read locally at press. Under Reduce Motion, aiming advances angle/marker/number together every 300 ms; easing and scale motion are not used. Text, target/landing shape and location cues, state transition, and score contract remain.
-- The right panel has top/middle/bottom targets, exactly one active target, a fixed score slot, and text/shape/color result cues. Non-active targets render at 40% opacity.
-- The pure Swift core maps angle to normalized height (`0…1`), not desktop coordinates or a physics engine. Hit gives `+1`/`✓ 딸깍!`; miss gives `+0`/`× 아쉽다`; result remains for 1 second, then deterministically prepares the next target.
-- v1 is silent unlimited practice. No physics engine, sound, keyboard control, global input, screen-spanning overlay, network, files, clipboard, capture, analytics, or permissions are included.
+- No visible panel/card surface: no fill, border, radius, shadow, status, angle, track, persistent score, or “flying” UI.
+- The pure `SpearGameCore` owns normalized deterministic hit/miss and score semantics. `PresentationPolicy`/`PresentationLifecycle` are pure visual timing only; trajectory never changes judgement.
+- Standard: aiming pose cycle 600 ms ease-in-out; launch 120 ms; screen-space flight 500 ms (within 420–620 ms; release→impact ≤700 ms); result cue/reset completes release→Ready in 1.1 s.
+- Stickman poses are Ready, Aiming arm-back/body lean, Release forward arm/body shift, Flying, and recovery. A release produces one detached spear from hand to target or deterministic miss endpoint.
+- Hit shows target/check plus short `+1`; miss shows only endpoint/X. There is no persistent score.
+- Reduced Motion: 300 ms aiming step; no translation, arc, scale, body-shift, or fade trajectory. Release resolves to a static Hit/Miss cue; pure judgement and reset semantics remain.
 
-## Safety and UI boundary
+## Visibility-only flight layer
 
-- `OverlayController` creates two borderless, nonactivating `NSPanel` instances only. There is no TTALGAK window outside either panel: empty-area click-through is by absence.
-- Only left-panel `mouseDown`/`mouseUp` invokes game input. The right panel has no game action. Neither panel can become key/main.
-- Light surface (94% white), 1 px border, 14 pt radius, no shadow, linear stickman/spear/target, 16 pt bold state/angle/score, 12 pt endpoint labels, track marker tick, and non-color state cues are rendered locally. The bounded left panel is larger than the required `44 × 44 pt` local target.
-- SUIT is used when installed; otherwise `NSFont.systemFont` is the intentional local fallback. Mac QA must record which path rendered.
-- No Screen Recording, Accessibility, Input Monitoring, screen/window/file/clipboard access, `CGEventTap`, global/local monitor/shortcut, or external transmission exists in the source tree.
+During standard release only, a temporary transparent primary-display `FlightPanel` renders the spear. It uses public AppKit and is `.borderless` + `.nonactivatingPanel`, `ignoresMouseEvents = true`, and cannot become key/main. The layer has no event handler, keyboard handler, or custom hit-test; it is ordered out and released at impact before the result cue.
+
+This is explicit mouse-ignore click-through, not v1’s click-through-by-absence. During flight, desktop and underlying app click/button/text/drag input must still route below it. Left anchor local mouse down/up remains the only input. Right anchor and flight layer are visual-only.
+
+No global/local monitor, event tap/post, Accessibility/Input Monitoring/Screen Recording permission, capture, clipboard/file/network/data access, private API, sound, Dock tracking/baseline/Refresh, multi-display, Space, or full-screen support is added or claimed.
 
 ## Layout
 
-- `Package.swift` — SwiftPM executable, cross-platform pure-core target, XCTest target.
-- `Sources/SpearGameCore/SpearGameState.swift` — deterministic state machine, normalized judgement, and renderer timing policy seam.
-- `Sources/TTALGAK/OverlayController.swift` — two-panel placement, local timers, local public reduced-motion preference read, no desktop-sized window.
-- `Sources/TTALGAK/SpearThrowView.swift` — AppKit rendering and local pointer adapter.
-- `Tests/SpearGameStateTests.swift` — core state semantics plus motion policy contract.
+- `Package.swift` — SwiftPM executable, pure core, XCTest target.
+- `Sources/SpearGameCore/SpearGameState.swift` — normalized game state plus pure presentation policy/lifecycle.
+- `Sources/TTALGAK/OverlayController.swift` — two local anchors, temporary visibility-only flight-layer lifecycle, local timers, reduced-motion preference read.
+- `Sources/TTALGAK/SpearThrowView.swift` — transparent AppKit stickman/target/spear renderers; local left pointer adapter only.
+- `Tests/SpearGameStateTests.swift` — pure state plus v2 timing/lifecycle tests.
 - `Tests/verify_project.py` — Linux-safe static guardrail.
 
-## Build and test on a Mac
-
-```bash
-cd /path/to/TTALGAK
-swift package describe
-swift test
-swift build
-swift run TTALGAK
-```
-
-Xcode route: open `Package.swift`, select `TTALGAK` and `My Mac`, then Run. The accessory/menu-bar app has **Hide boxes**, **Show boxes**, and **Quit TTALGAK**.
-
-## Required Mac QA (M-01–M-10; not certified by Linux)
-
-| ID | Action | Expected PASS |
-|---|---|---|
-| M-01 | Run `swift package describe`, `swift test`, and `swift build`. | Every command exits 0 and XCTest passes. |
-| M-02 | Run `swift run TTALGAK`. | Menu-bar app and exactly two `180 × 110 pt` panels appear. |
-| M-03 | Calculate `expectedY = screen.frame.minY + clamp(screen.frame.height × 0.08, 72, 120)`; change Dock visibility, size, and edge. | Both panels retain formula Y, left/right X, and size; Dock does not affect placement. |
-| M-04 | Type a sentinel in another editor, press/hold/release left panel, then continue typing. | Editor retains text focus; TTALGAK never becomes key/main. |
-| M-05 | Hold left panel through low→high→low without release. | Angle, marker, and spear change together; no flight before release. Also inspect 16 pt bold Ready/Aiming/Flying/Hit/Miss labels and 16 pt angle/score for clipping or collision within `180 × 110 pt`. |
-| M-06 | Release once at matching and mismatching angles. | Standard motion: one right-panel-only 180–240 ms flight, Hit check/`딸깍!`/+1 or Miss X/`아쉽다`/+0, then Ready after 0.8–1.2 s. No duplicate score/result. |
-| M-07 | Press left, move pointer outside, and release. | Record actual AppKit capture/release PASS or FAIL; no global capture is added. |
-| M-08 | Click gaps/desktop and right panel. | Gaps pass through to the underlying app; right panel never starts the game. |
-| M-09 | Check Privacy & Security and launch dialogs; record SUIT/fallback. | No Screen Recording, Accessibility, or Input Monitoring prompt/request; rendered font path is recorded. |
-| M-10 | Enable System Settings Reduce Motion, then repeat M-05 and M-06. | 300 ms angle/marker/number steps; release goes directly to static Hit/Miss with text, target/landing shape, and location cues; no ease-in-out, panel-local flight, Hit scale, or other scale motion. State and score remain identical to standard policy. Verify 12 pt `20°`/`70°` labels and marker tick do not clip/collide. |
-
-Multi-display, Spaces, and full-screen apps remain unsupported unless separately tested and documented.
-
-## Linux static validation boundary
-
-Linux may run only the source guardrail:
-
-```bash
-python3 Tests/verify_project.py
-python3 -m py_compile Tests/verify_project.py
-swift test  # only when a Swift toolchain is installed
-```
-
-A Linux static pass is not a macOS runtime pass. It does not certify Swift/AppKit compilation, rendering, press/hold/release, pointer capture, focus retention, click-through, reduced-motion behavior, typography collision, or permission behavior.
-
-## Swift access-control recovery and required Mac acceptance
-
-The reported Mac compile failure came from internal `SpearThrowView`/`TargetView` inheriting `private PanelView`. `PanelView` now has internal default access, matching those subclasses. `Tests/verify_project.py` rejects a private or fileprivate `PanelView` superclass while retaining the existing safety assertions.
-
-After GitHub delivery, the representative must run and return output for:
+## Representative Mac commands
 
 ```bash
 cd /Users/littleduck/Documents/GitHub/TTALGAK
@@ -84,4 +39,26 @@ swift build
 swift run TTALGAK
 ```
 
-Until that output is returned, macOS compile and runtime acceptance remain pending; Linux static checks are not a replacement.
+Xcode route: open `Package.swift`, select `TTALGAK` and `My Mac`, then Run. The menu-bar app offers Hide/Show TTALGAK and Quit.
+
+## Required Mac QA (pending until representative output)
+
+1. Run every command above; return stdout/stderr and exit results.
+2. Confirm only one stickman/held spear at left and one target at right; no card, text/status, angle/track, or persistent score.
+3. Standard hit and miss: hold to observe Ready→Aiming arm-back/body lean, release to observe forward throw/recovery and one continuous hand→target/miss flight. Confirm impact occurs within 700 ms and Ready by 1.1–1.3 s.
+4. Focus: type a sentinel into another app, press/hold/release, then keep typing. TTALGAK must never become key/main.
+5. During the visible flight layer, click an underlying button/text field and start an underlying drag. All must route beneath the layer; right anchor must never start a throw.
+6. Confirm each layer appears only for standard flight, has `ignoresMouseEvents = true`, is non-key/non-main, disappears before next Ready, and creates no duplicate spear.
+7. Enable Reduce Motion and repeat hit/miss. Observe 300 ms aim steps and immediate static result; no translation, arc, scale, body shift, or trajectory fade.
+8. Check Privacy & Security and launch dialogs: no Screen Recording, Accessibility, or Input Monitoring prompt/request. Record font behavior if relevant.
+9. Confirm Dock visible/hidden/size/edge does not change anchor X/Y/size or flight start/end source. Do not report multi-display, Spaces, or full-screen support without separate Mac QA.
+
+## Linux static validation boundary
+
+```bash
+python3 Tests/verify_project.py
+python3 -m py_compile Tests/verify_project.py
+swift test  # only when Swift is installed
+```
+
+A Linux static pass is not a macOS runtime pass. It does not certify Swift/AppKit compilation, rendering, pose timing, real cross-screen flight, focus retention, click/drag/input pass-through, layer lifecycle, reduced-motion behavior, or permission behavior.
