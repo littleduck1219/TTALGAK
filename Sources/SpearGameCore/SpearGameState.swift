@@ -48,35 +48,42 @@ public struct PresentationPoint: Equatable {
     }
 }
 
-/// Pure y-up quadratic Bézier path; visual-only and independent of game judgement.
+/// Pure y-up cubic Bézier flight path; visual-only and independent of game judgement.
 public struct PresentationFlightPath: Equatable {
     public let start: PresentationPoint
+    public let startControl: PresentationPoint
+    public let endControl: PresentationPoint
     public let end: PresentationPoint
-    public let height: Double
-    public let control: PresentationPoint
+    public let startControlDistance: Double
+    public let endControlDistance: Double
 
-    public init(start: PresentationPoint, end: PresentationPoint) {
+    public init(start: PresentationPoint, end: PresentationPoint, aimDegrees: Double) {
+        precondition(end.x > start.x)
         self.start = start
         self.end = end
-        let dx = abs(end.x - start.x)
-        height = min(max(0.14 * dx, 96), 180)
-        control = PresentationPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 + 2 * height)
+        let dx = end.x - start.x
+        let theta = min(max(aimDegrees, 25), 65) * .pi / 180
+        startControlDistance = min(max(0.12 * dx, 80), 160)
+        endControlDistance = min(max(0.30 * dx, 180), 360)
+        startControl = PresentationPoint(x: start.x + startControlDistance * cos(theta), y: start.y + startControlDistance * sin(theta))
+        endControl = PresentationPoint(x: end.x - endControlDistance * cos(35 * .pi / 180), y: end.y + endControlDistance * sin(35 * .pi / 180))
     }
 
     public func point(at progress: Double) -> PresentationPoint {
         let t = min(max(progress, 0), 1)
         let u = 1 - t
         return PresentationPoint(
-            x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
-            y: u * u * start.y + 2 * u * t * control.y + t * t * end.y
+            x: u * u * u * start.x + 3 * u * u * t * startControl.x + 3 * u * t * t * endControl.x + t * t * t * end.x,
+            y: u * u * u * start.y + 3 * u * u * t * startControl.y + 3 * u * t * t * endControl.y + t * t * t * end.y
         )
     }
 
     public func tangent(at progress: Double) -> PresentationPoint {
         let t = min(max(progress, 0), 1)
+        let u = 1 - t
         return PresentationPoint(
-            x: 2 * (1 - t) * (control.x - start.x) + 2 * t * (end.x - control.x),
-            y: 2 * (1 - t) * (control.y - start.y) + 2 * t * (end.y - control.y)
+            x: 3 * u * u * (startControl.x - start.x) + 6 * u * t * (endControl.x - startControl.x) + 3 * t * t * (end.x - endControl.x),
+            y: 3 * u * u * (startControl.y - start.y) + 6 * u * t * (endControl.y - startControl.y) + 3 * t * t * (end.y - endControl.y)
         )
     }
 }

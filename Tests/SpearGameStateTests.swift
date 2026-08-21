@@ -107,19 +107,70 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(policy.staticResultDuration, 0.5, accuracy: 0.0001)
     }
 
-    func testQuadraticFlightPathUsesExactHeightControlPointAndEndpoints() {
-        let path = PresentationFlightPath(start: PresentationPoint(x: 48, y: 20), end: PresentationPoint(x: 1232, y: 80))
-        XCTAssertEqual(path.height, 165.76, accuracy: 0.0001)
-        XCTAssertEqual(path.control, PresentationPoint(x: 640, y: 381.52))
-        XCTAssertEqual(path.point(at: 0), path.start)
-        XCTAssertEqual(path.point(at: 1), path.end)
-        XCTAssertEqual(path.point(at: 0.5).y, 215.76, accuracy: 0.0001)
-        XCTAssertGreaterThan(path.tangent(at: 0.5).x, 0)
+    func testCubicFlightPathStartsAtHeldTailWithExactTangentAtVisibleAimBoundsAndMidpoint() {
+        let start = PresentationPoint(x: 48, y: 20)
+        let end = PresentationPoint(x: 1232, y: 80)
+        for aimDegrees in [25.0, 45.0, 65.0] {
+            let geometry = SpearPresentationGeometry(pose: .release, aimDegrees: aimDegrees)
+            let path = PresentationFlightPath(start: start, end: end, aimDegrees: geometry.aimDegrees)
+            let held = subtract(geometry.heldSpearEnd, geometry.heldSpearOrigin)
+            let tangent = path.tangent(at: 0)
+            XCTAssertEqual(path.point(at: 0), start)
+            XCTAssertGreaterThanOrEqual(dot(normalized(tangent), normalized(held)), 0.999999)
+            XCTAssertLessThanOrEqual(angularDeltaDegrees(tangent, held), 0.001)
+        }
     }
 
-    func testQuadraticFlightPathClampsHeightAtBothBounds() {
-        XCTAssertEqual(PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 100, y: 0)).height, 96)
-        XCTAssertEqual(PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 2000, y: 0)).height, 180)
+    func testCubicFlightPathEndsAtExactTargetOrMissEndpointWithDescendingApproach() {
+        let target = PresentationPoint(x: 1232, y: 80)
+        let lowMiss = PresentationPoint(x: 1274, y: 48)
+        let highMiss = PresentationPoint(x: 1274, y: 112)
+        let expectedEndTangent = PresentationPoint(x: cos(35 * .pi / 180), y: -sin(35 * .pi / 180))
+        for (aimDegrees, endpoint) in [(25.0, target), (65.0, target), (25.0, lowMiss), (65.0, highMiss)] {
+            let path = PresentationFlightPath(start: PresentationPoint(x: 48, y: 20), end: endpoint, aimDegrees: aimDegrees)
+            XCTAssertEqual(path.point(at: 1), endpoint)
+            XCTAssertGreaterThanOrEqual(dot(normalized(path.tangent(at: 1)), expectedEndTangent), 0.999999)
+            XCTAssertLessThanOrEqual(angularDeltaDegrees(path.tangent(at: 1), expectedEndTangent), 0.001)
+        }
+        XCTAssertEqual(resolvedPhase(target: .bottom, rawAim: 20), .hit)
+        XCTAssertEqual(resolvedPhase(target: .top, rawAim: 70), .hit)
+        XCTAssertEqual(resolvedPhase(target: .top, rawAim: 20), .miss)
+        XCTAssertEqual(resolvedPhase(target: .bottom, rawAim: 70), .miss)
+    }
+
+    private func resolvedPhase(target: TargetPosition, rawAim: Double) -> GamePhase {
+        var game = SpearGameState(firstTarget: target)
+        game.beginAim()
+        game.setAim(angleDegrees: rawAim)
+        game.release()
+        game.resolveFlight()
+        return game.phase
+    }
+
+    func testCubicFlightPathUsesExactControlDistanceClamps() {
+        let short = PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 100, y: 0), aimDegrees: 25)
+        let long = PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 2000, y: 0), aimDegrees: 65)
+        XCTAssertEqual(short.startControlDistance, 80, accuracy: 0.0001)
+        XCTAssertEqual(short.endControlDistance, 180, accuracy: 0.0001)
+        XCTAssertEqual(long.startControlDistance, 160, accuracy: 0.0001)
+        XCTAssertEqual(long.endControlDistance, 360, accuracy: 0.0001)
+    }
+
+    private func subtract(_ lhs: PresentationPoint, _ rhs: PresentationPoint) -> PresentationPoint {
+        PresentationPoint(x: lhs.x - rhs.x, y: lhs.y - rhs.y)
+    }
+
+    private func normalized(_ vector: PresentationPoint) -> PresentationPoint {
+        let length = hypot(vector.x, vector.y)
+        return PresentationPoint(x: vector.x / length, y: vector.y / length)
+    }
+
+    private func dot(_ lhs: PresentationPoint, _ rhs: PresentationPoint) -> Double {
+        lhs.x * rhs.x + lhs.y * rhs.y
+    }
+
+    private func angularDeltaDegrees(_ lhs: PresentationPoint, _ rhs: PresentationPoint) -> Double {
+        acos(min(1, max(-1, dot(normalized(lhs), normalized(rhs))))) * 180 / .pi
     }
 
     func testPresentationLifecycleUsesReleaseFlyingCueThenReady() {

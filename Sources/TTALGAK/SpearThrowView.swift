@@ -93,12 +93,14 @@ final class TargetView: NSView {
 final class FlightView: NSView {
     var start = NSPoint.zero { didSet { needsDisplay = true } }
     var end = NSPoint.zero { didSet { needsDisplay = true } }
+    var aimDegrees = 45.0 { didSet { needsDisplay = true } }
     var progress: CGFloat = 0 { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         let path = PresentationFlightPath(
             start: PresentationPoint(x: Double(start.x), y: Double(start.y)),
-            end: PresentationPoint(x: Double(end.x), y: Double(end.y))
+            end: PresentationPoint(x: Double(end.x), y: Double(end.y)),
+            aimDegrees: aimDegrees
         )
         let point = path.point(at: Double(progress))
         let tangent = path.tangent(at: Double(progress))
@@ -107,8 +109,8 @@ final class FlightView: NSView {
 
     private func drawSpear(at point: NSPoint, angle: CGFloat) {
         let length: CGFloat = 42
-        let tail = NSPoint(x: point.x - cos(angle) * length / 2, y: point.y - sin(angle) * length / 2)
-        let tip = NSPoint(x: point.x + cos(angle) * length / 2, y: point.y + sin(angle) * length / 2)
+        let tail = NSPoint(x: CGFloat(point.x), y: CGFloat(point.y))
+        let tip = NSPoint(x: tail.x + cos(angle) * length, y: tail.y + sin(angle) * length)
         ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke()
         let head = NSBezierPath(); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 6, y: tip.y - 3)); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 5, y: tip.y + 4)); head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke()
     }

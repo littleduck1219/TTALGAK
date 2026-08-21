@@ -86,6 +86,7 @@ final class OverlayController {
         let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size))
         flight.start = NSPoint(x: start.x - screen.frame.minX, y: start.y - screen.frame.minY)
         flight.end = NSPoint(x: end.x - screen.frame.minX, y: end.y - screen.frame.minY)
+        flight.aimDegrees = geometry.aimDegrees
         panel.contentView = flight
         flightPanel = panel
         panel.orderFrontRegardless()
