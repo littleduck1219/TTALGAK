@@ -33,7 +33,9 @@ public struct FlightLayerContract: Equatable {
 }
 
 public enum DragLaunch {
-    public static func angle(forVerticalDrag dy: Double) -> Double { min(max(45 + 20 * dy / 48, 25), 65) }
+    // Asymmetric range around center 45: downward drag spans 35 degrees to the 10-degree floor,
+    // upward drag spans 20 degrees to the 65-degree ceiling, both over the same 48pt travel.
+    public static func angle(forVerticalDrag dy: Double) -> Double { min(max(45 + (dy < 0 ? 35 : 20) * dy / 48, 10), 65) }
     public static func tangent(angleDegrees: Double) -> PresentationPoint {
         let radians = angleDegrees * .pi / 180
         return PresentationPoint(x: cos(radians), y: sin(radians))
@@ -98,7 +100,7 @@ public struct FrozenLaunch: Equatable {
     public let power: Double
     public let start: PresentationPoint
     public init(angleDegrees: Double, power: Double, start: PresentationPoint) {
-        self.angleDegrees = min(max(angleDegrees, 25), 65)
+        self.angleDegrees = min(max(angleDegrees, 10), 65)
         self.power = min(max(power, 0), 1)
         self.start = start
     }
@@ -152,7 +154,7 @@ public struct BallisticFlightPath: Equatable {
 
     public init(start: PresentationPoint, angleDegrees: Double, power: Double, groundY: Double) {
         self.start = start
-        self.angleDegrees = min(max(angleDegrees, 25), 65)
+        self.angleDegrees = min(max(angleDegrees, 10), 65)
         self.power = min(max(power, 0), 1)
         self.groundY = groundY
         v0 = 900 + 1000 * self.power

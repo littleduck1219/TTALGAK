@@ -32,6 +32,19 @@ assert '320 / sqrt(2)' in tests and '(72.0 - 6) / 314' in tests
 assert '(160.0 - 6) / 314' in tests and '(240.0 - 6) / 314' in tests
 assert 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput' in tests
 
+# Asymmetric angle range 10...65 around center 45: dy=-48 -> 10 (slope 35/48 down), dy=+48 -> 65 (slope 20/48 up).
+# The old symmetric mapping and any 25-degree minimum clamp must fail.
+assert '45 + (dy < 0 ? 35 : 20) * dy / 48, 10), 65' in core
+assert '45 + 20 * dy / 48, 25' not in core
+assert ', 25), 65)' not in core
+assert core.count('min(max(angleDegrees, 10), 65)') == 2
+assert 'forVerticalDrag: -48), 10' in tests and 'forVerticalDrag: 48), 65' in tests
+assert 'forVerticalDrag: -24), 27.5' in tests and 'forVerticalDrag: 24), 55' in tests
+assert 'forVerticalDrag: -96), 10' in tests and 'forVerticalDrag: 96), 65' in tests
+assert '[10.0, 45.0, 65.0]' in tests and '[25.0, 45.0, 65.0]' not in tests
+assert 'testLaunchAndFlightClampAnglesToTenSixtyFive' in tests
+assert 'tangent(angleDegrees: 25)' not in tests
+
 # Power latch: first 6pt dead-zone crossing freezes the tangent; afterwards power is measured only along
 # that frozen axis (-dx / tangent.x). Per-current-angle re-projection of power on every move must fail.
 assert 'latchedTangent' in core
@@ -92,4 +105,4 @@ for forbidden in ('targetX', 'canonicalHeight', 'canonicalAim', 'launchCoefficie
 for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
     assert expected in tests
 assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
-print('PASS: TTALGAK v3 local drag (320pt pull), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
+print('PASS: TTALGAK v3 local drag (320pt pull, asymmetric angle 10...65), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')

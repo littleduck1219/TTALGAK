@@ -3,9 +3,13 @@ import XCTest
 
 final class SpearGameStateTests: XCTestCase {
     func testDragMapsExactAngleAndReverseTangentPower() {
-        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -48), 25, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -48), 10, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 0), 45, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 48), 65, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -24), 27.5, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 24), 55, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -96), 10, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 96), 65, accuracy: 0.0001)
         let angle = 45.0
         XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -6 / sqrt(2), y: -6 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -163 / sqrt(2), y: -163 / sqrt(2)), angleDegrees: angle), 0.5, accuracy: 0.0001)
@@ -79,26 +83,47 @@ final class SpearGameStateTests: XCTestCase {
     }
 
     func testAnglesHaveDifferentApexAndLandingAtSamePower() {
-        let paths = [25.0, 45.0, 65.0].map { BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: $0, power: 0.5, groundY: 16) }
+        let paths = [10.0, 45.0, 65.0].map { BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: $0, power: 0.5, groundY: 16) }
         XCTAssertGreaterThan(abs(paths[0].apex.y - paths[1].apex.y), 0.001)
         XCTAssertGreaterThan(abs(paths[1].apex.y - paths[2].apex.y), 0.001)
         XCTAssertGreaterThan(abs(paths[0].groundCrossing.tail.x - paths[1].groundCrossing.tail.x), 0.001)
         XCTAssertGreaterThan(abs(paths[1].groundCrossing.tail.x - paths[2].groundCrossing.tail.x), 0.001)
     }
 
+    func testLaunchAndFlightClampAnglesToTenSixtyFive() {
+        let start = PresentationPoint(x: 48, y: 108)
+        XCTAssertEqual(FrozenLaunch(angleDegrees: 5, power: 0.5, start: start).angleDegrees, 10, accuracy: 0.0001)
+        XCTAssertEqual(FrozenLaunch(angleDegrees: 80, power: 0.5, start: start).angleDegrees, 65, accuracy: 0.0001)
+        XCTAssertEqual(BallisticFlightPath(start: start, angleDegrees: 5, power: 0.5, groundY: 16).angleDegrees, 10, accuracy: 0.0001)
+        XCTAssertEqual(BallisticFlightPath(start: start, angleDegrees: 80, power: 0.5, groundY: 16).angleDegrees, 65, accuracy: 0.0001)
+        let low = BallisticFlightPath(start: start, angleDegrees: 10, power: 0.5, groundY: 16)
+        XCTAssertEqual(low.groundCrossing.tip.y, 16, accuracy: 0.001)
+        XCTAssertGreaterThan(low.groundCrossing.elapsed, 0)
+        XCTAssertLessThan(low.apex.y, BallisticFlightPath(start: start, angleDegrees: 45, power: 0.5, groundY: 16).apex.y)
+    }
+
     func testTargetIsNotLaunchInputAndGroundCrossingIsPhysical() {
         let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: 45, power: 0.5, groundY: 16)
         XCTAssertEqual(path.gravity, 2400, accuracy: 0.0001)
         XCTAssertEqual(path.v0, 1400, accuracy: 0.0001)
-        XCTAssertEqual(path.groundCrossing.tail.y, 16, accuracy: 0.0001)
+        XCTAssertEqual(path.groundCrossing.tip.y, 16, accuracy: 0.001)
         XCTAssertGreaterThan(path.groundCrossing.elapsed, 0)
     }
 
     func testActualShaftSegmentCollisionAndGroundMiss() {
+        // firstImpact linearizes between its two samples, so query it per frame like the flight timer does.
+        func frameSweptImpact(path: BallisticFlightPath, target: PresentationPoint) -> Double? {
+            var elapsed = 0.0
+            while elapsed < path.groundCrossing.elapsed {
+                let next = min(elapsed + 1.0 / 60, path.groundCrossing.elapsed)
+                if let hit = SpearCollision.firstImpact(path: path, target: target, fromElapsed: elapsed, toElapsed: next) { return hit }
+                elapsed = next
+            }
+            return nil
+        }
         let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: 45, power: 0.5, groundY: 16)
-        let hit = PresentationPoint(x: 280, y: 270)
-        XCTAssertNotNil(SpearCollision.firstImpact(path: path, target: hit, fromElapsed: 0, toElapsed: path.groundCrossing.elapsed))
-        XCTAssertNil(SpearCollision.firstImpact(path: path, target: PresentationPoint(x: 260, y: 700), fromElapsed: 0, toElapsed: path.groundCrossing.elapsed))
+        XCTAssertNotNil(frameSweptImpact(path: path, target: PresentationPoint(x: 280, y: 270)))
+        XCTAssertNil(frameSweptImpact(path: path, target: PresentationPoint(x: 260, y: 700)))
     }
 
     func testGestureKeepsOutsideDragAndReleasesOnce() {
@@ -106,7 +131,7 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
         let outside = gesture.move(to: PresentationPoint(x: -100, y: 0), isInsideInput: false)
         XCTAssertNotNil(outside)
-        XCTAssertEqual(outside?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertEqual(outside?.angleDegrees ?? 0, 10, accuracy: 0.0001)
         XCTAssertGreaterThan(outside?.power ?? 0, 0)
         XCTAssertEqual(gesture.release(isInsideInput: false), outside)
         XCTAssertNil(gesture.release(isInsideInput: false))
@@ -115,11 +140,11 @@ final class SpearGameStateTests: XCTestCase {
     func testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput() {
         var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        let tangent = DragLaunch.tangent(angleDegrees: 25)
+        let tangent = DragLaunch.tangent(angleDegrees: 10)
         let almost = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 319, y: 48 - tangent.y * 319), isInsideInput: false)
         XCTAssertLessThan(almost?.power ?? 1, 1)
         let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 320, y: 48 - tangent.y * 320), isInsideInput: false)
-        XCTAssertEqual(full?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertEqual(full?.angleDegrees ?? 0, 10, accuracy: 0.0001)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
         XCTAssertEqual(gesture.release(isInsideInput: false), full)
     }
@@ -134,7 +159,7 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(raised?.angleDegrees ?? 0, 55, accuracy: 0.0001)
         XCTAssertEqual(raised?.power, latched?.power)
         let lowered = gesture.move(to: PresentationPoint(x: 28, y: 24), isInsideInput: true)
-        XCTAssertEqual(lowered?.angleDegrees ?? 0, 35, accuracy: 0.0001)
+        XCTAssertEqual(lowered?.angleDegrees ?? 0, 27.5, accuracy: 0.0001)
         XCTAssertEqual(lowered?.power, latched?.power)
         XCTAssertEqual(gesture.release(isInsideInput: true), lowered)
     }
@@ -160,7 +185,7 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(halfway?.power ?? 0, (160.0 - 6) / 314, accuracy: 0.0001)
         let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 320, y: 48 - tangent.y * 320), isInsideInput: true)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
-        XCTAssertEqual(full?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertEqual(full?.angleDegrees ?? 0, 10, accuracy: 0.0001)
         XCTAssertEqual(gesture.release(isInsideInput: true), full)
     }
 
