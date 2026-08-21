@@ -38,11 +38,13 @@ public enum DragLaunch {
         let radians = angleDegrees * .pi / 180
         return PresentationPoint(x: cos(radians), y: sin(radians))
     }
-    public static func power(displacement: PresentationPoint, angleDegrees: Double) -> Double {
-        let tangent = tangent(angleDegrees: angleDegrees)
-        let reverse = max(0, -(displacement.x * tangent.x + displacement.y * tangent.y))
+    public static func power(reverse: Double) -> Double {
         if reverse <= 6 { return 0 }
         return min((reverse - 6) / 154, 1)
+    }
+    public static func power(displacement: PresentationPoint, angleDegrees: Double) -> Double {
+        let tangent = tangent(angleDegrees: angleDegrees)
+        return power(reverse: max(0, -(displacement.x * tangent.x + displacement.y * tangent.y)))
     }
 }
 
@@ -105,10 +107,12 @@ public struct FrozenLaunch: Equatable {
 /// Local-only gesture state. After a valid local start-zone down, local drag/up containment is deliberately ignored until that NSView receives mouseUp; it never queries global pointer state.
 public struct LocalGesture: Equatable {
     private var down: PresentationPoint?
+    private var latchedTangent: PresentationPoint?
     public private(set) var launch: FrozenLaunch?
     public init() {}
     public mutating func begin(at point: PresentationPoint, inStartZone: Bool) -> Bool {
         down = inStartZone ? point : nil
+        latchedTangent = nil
         launch = nil
         return inStartZone
     }
@@ -116,7 +120,13 @@ public struct LocalGesture: Equatable {
         guard let down else { return nil }
         let displacement = point - down
         let angle = DragLaunch.angle(forVerticalDrag: displacement.y)
-        let value = FrozenLaunch(angleDegrees: angle, power: DragLaunch.power(displacement: displacement, angleDegrees: angle), start: start)
+        if latchedTangent == nil, DragLaunch.power(displacement: displacement, angleDegrees: angle) > 0 {
+            latchedTangent = DragLaunch.tangent(angleDegrees: angle)
+        }
+        // Displacement decomposes as a*latchedTangent + b*(0,1): pull power reads only a = dx/tangent.x,
+        // so vertical (angle-only) moves can never shrink or grow a latched power.
+        let power = latchedTangent.map { DragLaunch.power(reverse: -displacement.x / $0.x) } ?? 0
+        let value = FrozenLaunch(angleDegrees: angle, power: power, start: start)
         launch = value
         return value
     }

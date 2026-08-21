@@ -31,6 +31,20 @@ assert '(reverse - 6) / 66' not in core
 assert '160 / sqrt(2)' in tests and '(72.0 - 6) / 154' in tests
 assert 'testMaxPowerNeedsFullOneSixtyPullOutsideLocalInput' in tests
 
+# Power latch: first 6pt dead-zone crossing freezes the tangent; afterwards power is measured only along
+# that frozen axis (-dx / tangent.x). Per-current-angle re-projection of power on every move must fail.
+assert 'latchedTangent' in core
+assert 'DragLaunch.power(reverse: -displacement.x / $0.x)' in core
+assert 'latchedTangent = DragLaunch.tangent(angleDegrees: angle)' in core
+assert 'latchedTangent = nil' in core
+assert 'power: DragLaunch.power(displacement: displacement, angleDegrees: angle)' not in core
+assert 'testAngleOnlyVerticalMoveKeepsLatchedPowerExactlyWhileAngleChanges' in tests
+assert 'testFurtherPullAlongFrozenReverseTangentRaisesLatchedPower' in tests
+assert 'testFrozenAxisFullPullReachesExactMaxAtOneSixty' in tests
+assert 'testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower' in tests
+assert 'XCTAssertEqual(raised?.power, latched?.power)' in tests
+assert 'XCTAssertEqual(lowered?.power, latched?.power)' in tests
+
 # In-memory ground-miss FIFO (50, oldest evicted); hits never retained; renderer draws stored spears, no ground line.
 assert 'GroundSpearInventory' in core and 'capacity = 50' in core and 'guard !hit else { return }' in core
 assert 'groundInventory.record(hit: hit' in overlay

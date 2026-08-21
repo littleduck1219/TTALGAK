@@ -122,6 +122,54 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(gesture.release(isInsideInput: false), full)
     }
 
+    func testAngleOnlyVerticalMoveKeepsLatchedPowerExactlyWhileAngleChanges() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
+        XCTAssertEqual(latched?.angleDegrees ?? 0, 45, accuracy: 0.0001)
+        XCTAssertGreaterThan(latched?.power ?? 0, 0)
+        let raised = gesture.move(to: PresentationPoint(x: 28, y: 72), isInsideInput: true)
+        XCTAssertEqual(raised?.angleDegrees ?? 0, 55, accuracy: 0.0001)
+        XCTAssertEqual(raised?.power, latched?.power)
+        let lowered = gesture.move(to: PresentationPoint(x: 28, y: 24), isInsideInput: true)
+        XCTAssertEqual(lowered?.angleDegrees ?? 0, 35, accuracy: 0.0001)
+        XCTAssertEqual(lowered?.power, latched?.power)
+        XCTAssertEqual(gesture.release(isInsideInput: true), lowered)
+    }
+
+    func testFurtherPullAlongFrozenReverseTangentRaisesLatchedPower() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
+        XCTAssertGreaterThan(latched?.power ?? 0, 0)
+        let pulled = gesture.move(to: PresentationPoint(x: 28 - tangent.x * 40, y: 48 - tangent.y * 40), isInsideInput: true)
+        XCTAssertEqual(pulled?.power ?? 0, (latched?.power ?? 0) + 40.0 / 154, accuracy: 0.0001)
+        XCTAssertGreaterThan(pulled?.power ?? 0, latched?.power ?? 1)
+    }
+
+    func testFrozenAxisFullPullReachesExactMaxAtOneSixty() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
+        XCTAssertGreaterThan(latched?.power ?? 0, 0)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: true)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
+        XCTAssertEqual(full?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertEqual(gesture.release(isInsideInput: true), full)
+    }
+
+    func testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        let up = gesture.move(to: PresentationPoint(x: 48, y: 96), isInsideInput: true)
+        XCTAssertEqual(up?.angleDegrees ?? 0, 65, accuracy: 0.0001)
+        XCTAssertEqual(up?.power ?? 1, 0, accuracy: 0.0001)
+        let down = gesture.move(to: PresentationPoint(x: 48, y: 44), isInsideInput: true)
+        XCTAssertEqual(down?.power ?? 1, 0, accuracy: 0.0001)
+    }
+
     func testGestureNextValidDownDiscardsStaleLaunch() {
         var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
