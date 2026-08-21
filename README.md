@@ -1,16 +1,17 @@
 # TTALGAK 창던지기 v2
 
-Native macOS 13+ menu-bar mini game. The primary display keeps exactly two transparent `180 × 110 pt` AppKit anchors: left is the only local press/hold/release surface and visually contains one stickman plus held spear; right is noninteractive and visually contains one target. Their X positions and app-owned Y inset are fixed: `screen.frame.minY + clamp(screen.frame.height × 0.08, 72, 120)`. Windows is out of scope.
+Native macOS 13+ menu-bar mini game. The primary display keeps exactly two transparent `180 × 110 pt` AppKit anchors: left is the only local press/hold/release surface and visually contains one black stickman plus held spear with its body at `screen.frame.minX + 48 pt`; right is noninteractive and visually contains one black target centered at `screen.frame.maxX - 48 pt`. Their structural X bounds and app-owned Y inset remain `screen.frame.minY + clamp(screen.frame.height × 0.08, 72, 120)`. Windows is out of scope.
 
 ## Product and motion contract
 
 - No visible panel/card surface: no fill, border, radius, shadow, status, angle, track, persistent score, or “flying” UI.
-- The pure `SpearGameCore` owns normalized deterministic hit/miss and score semantics. `PresentationPolicy`/`PresentationLifecycle` are pure visual timing only; trajectory never changes judgement.
-- Standard: aiming pose cycle 600 ms ease-in-out; launch 120 ms; screen-space flight 500 ms (within 420–620 ms; release→impact ≤700 ms); result cue/reset completes release→Ready in 1.1 s.
-- Stickman poses are Ready, Aiming arm-back/body lean, Release forward arm/body shift, Flying, and recovery. Aiming derives its visible 25°↔65° sweep from the current game aim through one deterministic presentation geometry value; standard keeps the 600 ms policy and Reduced Motion keeps the 300 ms/no-translation contract.
-- The shared presentation geometry is the sole source of rendered arm/hand, held-spear origin/end, and FlightPanel start. A release produces exactly one detached spear from the rendered release hand to target or deterministic miss endpoint without a separate coordinate.
-- Hit shows target/check plus short `+1`; miss shows only endpoint/X. There is no persistent score.
-- Reduced Motion: 300 ms aiming step; no translation, arc, scale, body-shift, or fade trajectory. Release resolves to a static Hit/Miss cue; pure judgement and reset semantics remain.
+- All visible ink is `#000000` at alpha 1.0: no tint, opacity, shadow, gradient, blue/yellow/green/red accent, or color exception. Background remains transparent; hit/miss use black shape cues only.
+- Stickman head/body/limbs and held shaft are 3 pt (held tip 2.5 pt); flight shaft/tip are 3.5/3 pt; target rings/check/X are 3.5 pt; target center is a solid 8 pt black circle. Every stroked path uses round caps and joins.
+- The pure `SpearGameCore` owns normalized deterministic hit/miss and score semantics. `PresentationPolicy`/`PresentationLifecycle`/`PresentationFlightPath` are pure visual timing and Bézier geometry only; trajectory never changes judgement.
+- Standard: aiming pose cycle 600 ms; launch 160 ms ease-out; flight 820 ms ease-in-out along `P0/P1/P2` quadratic Bézier; impact 140 ms; static hold 360 ms; reset 220 ms ease-in-out. Release→impact is 980 ms and release→Ready is 1,480 ms. There is no bounce, shake, spin, flash, or target scale.
+- `P0` is the shared rendered release hand and `P2` is the current target/miss endpoint; `H = clamp(0.14 × abs(P2.x - P0.x), 96, 180)` and `P1 = (midpoint.x, midpoint.y + 2H)` in y-up primary-display local coordinates. Flight orientation uses `B'(t)`; sine, linear, and circular trajectories are excluded.
+- Stickman poses are Ready, Aiming arm-back/body lean, Release forward arm/body shift, Flying, and recovery. Aiming derives its visible 25°↔65° sweep from the current game aim through one deterministic presentation geometry value; Reduced Motion keeps the 300 ms discrete/no-translation contract.
+- Reduced Motion creates no flight layer and performs no translation, Bézier, rotation, scale, body shift, or fade trajectory. It preserves the 300 ms aim step then shows a static black hit check/+1 or miss X for 500 ms before Ready.
 
 ## Visibility-only flight layer
 
@@ -47,14 +48,14 @@ Xcode route: open `Package.swift`, select `TTALGAK` and `My Mac`, then Run. The 
 ## Required Mac QA (pending until representative output)
 
 1. Run every command above; return stdout/stderr and exit results.
-2. Confirm only one stickman/held spear at left and one target at right; no card, text/status, angle/track, or persistent score.
-3. Standard hit and miss: hold to observe Ready→Aiming arm-back/body lean, release to observe forward throw/recovery and one continuous hand→target/miss flight. Confirm impact occurs within 700 ms and Ready by 1.1–1.3 s.
+2. Confirm only one black stickman/held spear at left (`+48 pt` body/release-hand inset) and one black target centered at right (`−48 pt`); no card, text/status, angle/track, or persistent score. Check normal, aiming, hit, miss, and Reduced Motion frames for black-only ink, no tint/shadow/gradient, and specified 3–3.5 pt weights.
+3. Standard hit and miss: hold to observe Ready→Aiming arm-back/body lean, release to observe one continuous hand→target/miss flight. Verify the `H=96…180 pt` y-up quadratic Bézier parabola, tangent orientation, 820 ms observable flight, impact at about 980 ms, and Ready at about 1,480 ms; no bounce/shake/spin/flash/target scale.
 4. Focus: type a sentinel into another app, press/hold/release, then keep typing. TTALGAK must never become key/main.
 5. During the visible flight layer, click an underlying button/text field and start an underlying drag. All must route beneath the layer; right anchor must never start a throw.
-6. Confirm each layer appears only for standard flight, has `ignoresMouseEvents = true`, is non-key/non-main, disappears before next Ready, and creates no duplicate spear.
-7. Enable Reduce Motion and repeat hit/miss. Observe 300 ms aim steps and immediate static result; no translation, arc, scale, body shift, or trajectory fade.
+6. Confirm each layer appears only for standard flight, has `ignoresMouseEvents = true`, is non-key/non-main, remains through impact/result hold, then disappears before next Ready without duplicate spear.
+7. Enable Reduce Motion and repeat hit/miss. Observe a 300 ms discrete aim step and a 500 ms static black result with no flight layer, translation, Bézier, rotation, scale, body shift, or fade trajectory.
 8. Check Privacy & Security and launch dialogs: no Screen Recording, Accessibility, or Input Monitoring prompt/request. Record font behavior if relevant.
-9. Confirm Dock visible/hidden/size/edge does not change anchor X/Y/size or flight start/end source. Do not report multi-display, Spaces, or full-screen support without separate Mac QA.
+9. Confirm app-owned safe inset and two `180×110 pt` structural anchors remain unchanged. Do not report multi-display, Spaces, or full-screen support without separate Mac QA.
 
 ## Linux static validation boundary
 

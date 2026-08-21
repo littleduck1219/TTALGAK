@@ -85,24 +85,41 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(game.phase, .miss)
     }
 
-    func testV2StandardPresentationPolicyMeetsMotionBudget() {
+    func testV2StandardPresentationPolicyUsesExactRepresentativeTiming() {
         let policy = PresentationPolicy.standard
         XCTAssertEqual(policy.aimingCycle, 0.6, accuracy: 0.0001)
-        XCTAssertEqual(policy.launchDuration, 0.12, accuracy: 0.0001)
-        XCTAssertGreaterThanOrEqual(policy.flightDuration, 0.42)
-        XCTAssertLessThanOrEqual(policy.flightDuration, 0.62)
-        XCTAssertLessThanOrEqual(policy.launchDuration + policy.flightDuration, 0.7)
-        XCTAssertGreaterThanOrEqual(policy.resetDuration, 1.1)
-        XCTAssertLessThanOrEqual(policy.resetDuration, 1.3)
+        XCTAssertEqual(policy.launchDuration, 0.16, accuracy: 0.0001)
+        XCTAssertEqual(policy.flightDuration, 0.82, accuracy: 0.0001)
+        XCTAssertEqual(policy.impactDuration, 0.14, accuracy: 0.0001)
+        XCTAssertEqual(policy.resultHoldDuration, 0.36, accuracy: 0.0001)
+        XCTAssertEqual(policy.resetDuration, 0.22, accuracy: 0.0001)
+        XCTAssertEqual(policy.releaseToImpact, 0.98, accuracy: 0.0001)
+        XCTAssertEqual(policy.releaseToReady, 1.48, accuracy: 0.0001)
         XCTAssertTrue(policy.showsFlightTranslation)
     }
 
-    func testV2ReducedMotionHasStaticResultWithoutFlightTranslation() {
+    func testV2ReducedMotionHasOnlyDiscreteAimAndStaticResult() {
         let policy = PresentationPolicy.reducedMotion
         XCTAssertEqual(policy.aimingCycle, 0.3, accuracy: 0.0001)
         XCTAssertFalse(policy.showsFlightTranslation)
         XCTAssertEqual(policy.launchDuration, 0, accuracy: 0.0001)
         XCTAssertEqual(policy.flightDuration, 0, accuracy: 0.0001)
+        XCTAssertEqual(policy.staticResultDuration, 0.5, accuracy: 0.0001)
+    }
+
+    func testQuadraticFlightPathUsesExactHeightControlPointAndEndpoints() {
+        let path = PresentationFlightPath(start: PresentationPoint(x: 48, y: 20), end: PresentationPoint(x: 1232, y: 80))
+        XCTAssertEqual(path.height, 165.76, accuracy: 0.0001)
+        XCTAssertEqual(path.control, PresentationPoint(x: 640, y: 381.52))
+        XCTAssertEqual(path.point(at: 0), path.start)
+        XCTAssertEqual(path.point(at: 1), path.end)
+        XCTAssertEqual(path.point(at: 0.5).y, 215.76, accuracy: 0.0001)
+        XCTAssertGreaterThan(path.tangent(at: 0.5).x, 0)
+    }
+
+    func testQuadraticFlightPathClampsHeightAtBothBounds() {
+        XCTAssertEqual(PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 100, y: 0)).height, 96)
+        XCTAssertEqual(PresentationFlightPath(start: PresentationPoint(x: 0, y: 0), end: PresentationPoint(x: 2000, y: 0)).height, 180)
     }
 
     func testPresentationLifecycleUsesReleaseFlyingCueThenReady() {
@@ -112,11 +129,11 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(lifecycle.pose, .aiming)
         lifecycle.release()
         XCTAssertEqual(lifecycle.phase, .release)
-        lifecycle.advance(by: 0.12)
+        lifecycle.advance(by: 0.16)
         XCTAssertEqual(lifecycle.phase, .flying)
-        lifecycle.advance(by: 0.5)
+        lifecycle.advance(by: 0.82)
         XCTAssertEqual(lifecycle.phase, .cue)
-        lifecycle.advance(by: 0.48)
+        lifecycle.advance(by: 0.72)
         XCTAssertEqual(lifecycle.phase, .ready)
     }
 

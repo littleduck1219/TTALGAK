@@ -1,11 +1,7 @@
 import AppKit
 import SpearGameCore
 
-private let charcoal = NSColor(calibratedRed: 25/255, green: 31/255, blue: 40/255, alpha: 1)
-private let blue = NSColor(calibratedRed: 45/255, green: 100/255, blue: 241/255, alpha: 1)
-private let yellow = NSColor(calibratedRed: 243/255, green: 182/255, blue: 31/255, alpha: 1)
-private let green = NSColor(calibratedRed: 17/255, green: 122/255, blue: 70/255, alpha: 1)
-private let red = NSColor(calibratedRed: 217/255, green: 45/255, blue: 32/255, alpha: 1)
+private let ink = NSColor.black
 
 final class SpearThrowView: NSView {
     enum Event { case press, release }
@@ -31,11 +27,11 @@ final class SpearThrowView: NSView {
     var geometry: SpearPresentationGeometry { SpearPresentationGeometry(pose: pose, aimDegrees: aimDegrees) }
 
     private func drawStickman(geometry: SpearPresentationGeometry) {
-        let origin = NSPoint(x: 52, y: 33)
+        let origin = NSPoint(x: 48, y: 33)
         let pose = geometry.pose
-        charcoal.setStroke()
+        ink.setStroke()
         let head = NSBezierPath(ovalIn: NSRect(x: origin.x - 6, y: origin.y + 30, width: 12, height: 12))
-        head.lineWidth = 2; head.stroke()
+        head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke()
         let lean: CGFloat = pose == .aiming ? -3 : pose == .release ? 4 : 0
         let body = NSBezierPath()
         body.move(to: NSPoint(x: origin.x, y: origin.y + 30)); body.line(to: NSPoint(x: origin.x + lean, y: origin.y + 10))
@@ -44,15 +40,15 @@ final class SpearThrowView: NSView {
         let shoulder = NSPoint(x: CGFloat(geometry.shoulder.x), y: CGFloat(geometry.shoulder.y))
         let hand = NSPoint(x: CGFloat(geometry.hand.x), y: CGFloat(geometry.hand.y))
         body.move(to: shoulder); body.line(to: hand)
-        body.lineWidth = 2; body.lineCapStyle = .round; body.stroke()
+        body.lineWidth = 3; body.lineCapStyle = .round; body.lineJoinStyle = .round; body.stroke()
         guard pose == .ready || pose == .aiming else { return }
-        drawSpear(from: NSPoint(x: CGFloat(geometry.heldSpearOrigin.x), y: CGFloat(geometry.heldSpearOrigin.y)), to: NSPoint(x: CGFloat(geometry.heldSpearEnd.x), y: CGFloat(geometry.heldSpearEnd.y)), color: blue)
+        drawHeldSpear(from: NSPoint(x: CGFloat(geometry.heldSpearOrigin.x), y: CGFloat(geometry.heldSpearOrigin.y)), to: NSPoint(x: CGFloat(geometry.heldSpearEnd.x), y: CGFloat(geometry.heldSpearEnd.y)))
     }
 
-    private func drawSpear(from start: NSPoint, to end: NSPoint, color: NSColor) {
-        color.setStroke()
-        let spear = NSBezierPath(); spear.move(to: start); spear.line(to: end); spear.lineWidth = 2; spear.lineCapStyle = .round; spear.stroke()
-        let tip = NSBezierPath(); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 5, y: end.y - 3)); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 4, y: end.y + 4)); tip.lineWidth = 2; tip.stroke()
+    private func drawHeldSpear(from start: NSPoint, to end: NSPoint) {
+        ink.setStroke()
+        let spear = NSBezierPath(); spear.move(to: start); spear.line(to: end); spear.lineWidth = 3; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke()
+        let tip = NSBezierPath(); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 5, y: end.y - 3)); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 4, y: end.y + 4)); tip.lineWidth = 2.5; tip.lineCapStyle = .round; tip.lineJoinStyle = .round; tip.stroke()
     }
 }
 
@@ -67,7 +63,7 @@ final class TargetView: NSView {
     }
 
     var targetPoint: NSPoint {
-        NSPoint(x: 90, y: 22 + CGFloat(state.target.normalizedHeight) * 66)
+        NSPoint(x: 132, y: 22 + CGFloat(state.target.normalizedHeight) * 66)
     }
 
     private var missPoint: NSPoint {
@@ -76,21 +72,21 @@ final class TargetView: NSView {
     }
 
     private func drawTarget(at point: NSPoint) {
-        charcoal.setStroke()
+        ink.setStroke()
         for radius: CGFloat in [16, 10] {
             let circle = NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2))
-            circle.lineWidth = 2; circle.stroke()
+            circle.lineWidth = 3.5; circle.lineCapStyle = .round; circle.lineJoinStyle = .round; circle.stroke()
         }
-        yellow.setFill(); NSBezierPath(ovalIn: NSRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)).fill()
+        ink.setFill(); NSBezierPath(ovalIn: NSRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)).fill()
     }
 
     private func drawCheck(at point: NSPoint) {
-        green.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x + 16, y: point.y - 4)); mark.line(to: NSPoint(x: point.x + 21, y: point.y - 9)); mark.line(to: NSPoint(x: point.x + 30, y: point.y + 6)); mark.lineWidth = 2; mark.stroke()
-        NSAttributedString(string: "+1", attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .bold), .foregroundColor: green]).draw(at: NSPoint(x: point.x - 7, y: point.y + 22))
+        ink.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x + 16, y: point.y - 4)); mark.line(to: NSPoint(x: point.x + 21, y: point.y - 9)); mark.line(to: NSPoint(x: point.x + 30, y: point.y + 6)); mark.lineWidth = 3.5; mark.lineCapStyle = .round; mark.lineJoinStyle = .round; mark.stroke()
+        NSAttributedString(string: "+1", attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .bold), .foregroundColor: ink]).draw(at: NSPoint(x: point.x - 7, y: point.y + 22))
     }
 
     private func drawMiss(at point: NSPoint) {
-        red.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x - 5, y: point.y - 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y + 5)); mark.move(to: NSPoint(x: point.x - 5, y: point.y + 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y - 5)); mark.lineWidth = 2; mark.stroke()
+        ink.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x - 5, y: point.y - 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y + 5)); mark.move(to: NSPoint(x: point.x - 5, y: point.y + 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y - 5)); mark.lineWidth = 3.5; mark.lineCapStyle = .round; mark.lineJoinStyle = .round; mark.stroke()
     }
 }
 
@@ -100,18 +96,20 @@ final class FlightView: NSView {
     var progress: CGFloat = 0 { didSet { needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
-        let t = min(max(progress, 0), 1)
-        let x = start.x + (end.x - start.x) * t
-        let arch = sin(t * .pi) * min(48, abs(end.x - start.x) * 0.06)
-        let y = start.y + (end.y - start.y) * t + arch
-        drawSpear(at: NSPoint(x: x, y: y), angle: atan2(end.y - start.y, end.x - start.x))
+        let path = PresentationFlightPath(
+            start: PresentationPoint(x: Double(start.x), y: Double(start.y)),
+            end: PresentationPoint(x: Double(end.x), y: Double(end.y))
+        )
+        let point = path.point(at: Double(progress))
+        let tangent = path.tangent(at: Double(progress))
+        drawSpear(at: NSPoint(x: CGFloat(point.x), y: CGFloat(point.y)), angle: atan2(CGFloat(tangent.y), CGFloat(tangent.x)))
     }
 
     private func drawSpear(at point: NSPoint, angle: CGFloat) {
         let length: CGFloat = 42
         let tail = NSPoint(x: point.x - cos(angle) * length / 2, y: point.y - sin(angle) * length / 2)
         let tip = NSPoint(x: point.x + cos(angle) * length / 2, y: point.y + sin(angle) * length / 2)
-        blue.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 2; spear.lineCapStyle = .round; spear.stroke()
-        let head = NSBezierPath(); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 6, y: tip.y - 3)); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 5, y: tip.y + 4)); head.stroke()
+        ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke()
+        let head = NSBezierPath(); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 6, y: tip.y - 3)); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 5, y: tip.y + 4)); head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke()
     }
 }

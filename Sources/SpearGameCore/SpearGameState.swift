@@ -41,6 +41,44 @@ public enum StickmanPose: Equatable {
 public struct PresentationPoint: Equatable {
     public let x: Double
     public let y: Double
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
+}
+
+/// Pure y-up quadratic Bézier path; visual-only and independent of game judgement.
+public struct PresentationFlightPath: Equatable {
+    public let start: PresentationPoint
+    public let end: PresentationPoint
+    public let height: Double
+    public let control: PresentationPoint
+
+    public init(start: PresentationPoint, end: PresentationPoint) {
+        self.start = start
+        self.end = end
+        let dx = abs(end.x - start.x)
+        height = min(max(0.14 * dx, 96), 180)
+        control = PresentationPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 + 2 * height)
+    }
+
+    public func point(at progress: Double) -> PresentationPoint {
+        let t = min(max(progress, 0), 1)
+        let u = 1 - t
+        return PresentationPoint(
+            x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
+            y: u * u * start.y + 2 * u * t * control.y + t * t * end.y
+        )
+    }
+
+    public func tangent(at progress: Double) -> PresentationPoint {
+        let t = min(max(progress, 0), 1)
+        return PresentationPoint(
+            x: 2 * (1 - t) * (control.x - start.x) + 2 * t * (end.x - control.x),
+            y: 2 * (1 - t) * (control.y - start.y) + 2 * t * (end.y - control.y)
+        )
+    }
 }
 
 /// Single deterministic presentation source for arm, held spear, and launch origin.
@@ -99,16 +137,24 @@ public struct PresentationPolicy: Equatable {
     public let aimingCycle: Double
     public let launchDuration: Double
     public let flightDuration: Double
+    public let impactDuration: Double
+    public let resultHoldDuration: Double
     public let resetDuration: Double
+    public let staticResultDuration: Double
     public let showsFlightTranslation: Bool
 
+    public var releaseToImpact: Double { launchDuration + flightDuration }
+    public var releaseToReady: Double { releaseToImpact + impactDuration + resultHoldDuration + resetDuration }
+
     public static let standard = PresentationPolicy(
-        aimingCycle: 0.6, launchDuration: 0.12, flightDuration: 0.5,
-        resetDuration: 1.1, showsFlightTranslation: true
+        aimingCycle: 0.6, launchDuration: 0.16, flightDuration: 0.82,
+        impactDuration: 0.14, resultHoldDuration: 0.36, resetDuration: 0.22,
+        staticResultDuration: 0, showsFlightTranslation: true
     )
     public static let reducedMotion = PresentationPolicy(
         aimingCycle: 0.3, launchDuration: 0, flightDuration: 0,
-        resetDuration: 1.1, showsFlightTranslation: false
+        impactDuration: 0, resultHoldDuration: 0, resetDuration: 0,
+        staticResultDuration: 0.5, showsFlightTranslation: false
     )
 }
 
@@ -164,8 +210,8 @@ public struct PresentationLifecycle: Equatable {
 
     private var cueDuration: Double {
         policy.showsFlightTranslation
-            ? policy.resetDuration - policy.launchDuration - policy.flightDuration
-            : policy.resetDuration
+            ? policy.impactDuration + policy.resultHoldDuration + policy.resetDuration
+            : policy.staticResultDuration
     }
 }
 

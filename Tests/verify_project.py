@@ -45,13 +45,24 @@ assert 'geometry.heldSpearOrigin' in view and 'geometry.heldSpearEnd' in view
 assert 'FlightLayerContract.visibilityOnly' in overlay
 assert 'appearance = NSAppearance(named: .aqua)' in overlay
 assert 'FlightLayerContract.visibilityOnly.removesAtImpact' in overlay
-assert 'aimingCycle: 0.6' in core and 'launchDuration: 0.12' in core
-assert 'flightDuration: 0.5' in core and 'resetDuration: 1.1' in core
+assert 'aimingCycle: 0.6' in core and 'launchDuration: 0.16' in core
+assert 'flightDuration: 0.82' in core and 'impactDuration: 0.14' in core
+assert 'resultHoldDuration: 0.36' in core and 'resetDuration: 0.22' in core
+assert 'releaseToImpact' in core and 'releaseToReady' in core
+assert 'PresentationFlightPath' in core and '0.14 * dx' in core and 'min(max(0.14 * dx, 96), 180)' in core
 assert 'aimingCycle: 0.3' in core and 'showsFlightTranslation: false' in core
+assert 'staticResultDuration: 0.5' in core
+assert 'NSColor.black' in view
+assert 'NSColor(calibratedRed:' not in view and 'NSColor.system' not in view
+assert 'private let ink = NSColor.black' in view
+assert 'let origin = NSPoint(x: 48, y: 33)' in view
+assert 'NSPoint(x: 132, y:' in view
+assert 'lineWidth = 3' in view and 'lineWidth = 3.5' in view
+assert 'sin(t * .pi)' not in view and 'PresentationFlightPath' in view
 assert 'normalizedLanding' in core and 'hitTolerance' in core
 assert 'guard phase == .aiming else { return }' in core
 assert 'guard phase == .flying, let landingHeight else { return }' in core
-for expected in ('testV2StandardPresentationPolicyMeetsMotionBudget', 'testV2ReducedMotionHasStaticResultWithoutFlightTranslation', 'testPresentationLifecycleUsesReleaseFlyingCueThenReady', 'testReducedMotionLifecycleResolvesImmediatelyToStaticCue', 'testPresentationGeometryClampsCurrentAimToTheVisible25To65Sweep', 'testReleaseGeometrySharesRenderedHandHeldSpearOriginAndFlightStart', 'testVisibilityOnlyFlightContractAndDisplayOnlyAnchorAreExplicit'):
+for expected in ('testV2StandardPresentationPolicyUsesExactRepresentativeTiming', 'testV2ReducedMotionHasOnlyDiscreteAimAndStaticResult', 'testQuadraticFlightPathUsesExactHeightControlPointAndEndpoints', 'testQuadraticFlightPathClampsHeightAtBothBounds', 'testPresentationLifecycleUsesReleaseFlyingCueThenReady', 'testReducedMotionLifecycleResolvesImmediatelyToStaticCue', 'testPresentationGeometryClampsCurrentAimToTheVisible25To65Sweep', 'testReleaseGeometrySharesRenderedHandHeldSpearOriginAndFlightStart', 'testVisibilityOnlyFlightContractAndDisplayOnlyAnchorAreExplicit'):
     assert expected in tests
 for removed in ('roundedRect', 'borderColor', '날아가는 중', '각도 선택', '점', 'drawTrack', 'visibleFrame', 'baseline', 'Refresh placement baseline', 'refreshPlacementBaseline', 'didChangeScreenParametersNotification', 'NSWindow.didChangeOcclusionStateNotification'):
     assert removed not in all_source

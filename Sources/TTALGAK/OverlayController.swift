@@ -10,6 +10,7 @@ final class OverlayController {
     private var aimingTimer: Timer?
     private var flightTimer: Timer?
     private var resultTimer: Timer?
+    private var resetTimer: Timer?
     private var motionPolicy = MotionPolicy.standard
     private var presentationPolicy = PresentationPolicy.standard
     private var flightElapsed = 0.0
@@ -97,24 +98,34 @@ final class OverlayController {
         flightElapsed += step
         lifecycle.advance(by: step)
         if lifecycle.phase == .flying, let view = flightPanel?.contentView as? FlightView {
-            view.progress = CGFloat(min(1, max(0, (flightElapsed - presentationPolicy.launchDuration) / presentationPolicy.flightDuration)))
+            let rawProgress = min(1, max(0, (flightElapsed - presentationPolicy.launchDuration) / presentationPolicy.flightDuration))
+            view.progress = CGFloat(standardEaseInOut(rawProgress))
         }
-        if flightElapsed >= presentationPolicy.launchDuration + presentationPolicy.flightDuration { resolveFlight() }
+        if flightElapsed >= presentationPolicy.releaseToImpact { resolveFlight() }
         render()
     }
 
     private func resolveFlight() {
-        flightTimer?.invalidate(); flightTimer = nil; hideFlight()
+        flightTimer?.invalidate(); flightTimer = nil
         game.resolveFlight(); render()
-        let cueDuration = presentationPolicy.showsFlightTranslation
-            ? presentationPolicy.resetDuration - presentationPolicy.launchDuration - presentationPolicy.flightDuration
-            : presentationPolicy.resetDuration
-        resultTimer = Timer.scheduledTimer(withTimeInterval: cueDuration, repeats: false) { [weak self] _ in
+        let resultDuration = presentationPolicy.showsFlightTranslation
+            ? presentationPolicy.impactDuration + presentationPolicy.resultHoldDuration
+            : presentationPolicy.staticResultDuration
+        resultTimer = Timer.scheduledTimer(withTimeInterval: resultDuration, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.game.finishRound()
-            self.lifecycle = PresentationLifecycle(policy: self.presentationPolicy)
-            self.render()
+            self.hideFlight()
+            self.resetTimer = Timer.scheduledTimer(withTimeInterval: self.presentationPolicy.resetDuration, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                self.game.finishRound()
+                self.lifecycle = PresentationLifecycle(policy: self.presentationPolicy)
+                self.render()
+            }
         }
+    }
+
+    private func standardEaseInOut(_ progress: Double) -> Double {
+        let t = min(max(progress, 0), 1)
+        return t * t * (3 - 2 * t)
     }
 
     private func hideFlight() {
@@ -131,8 +142,8 @@ final class OverlayController {
     }
 
     private func stopTimers() {
-        [aimingTimer, flightTimer, resultTimer].forEach { $0?.invalidate() }
-        aimingTimer = nil; flightTimer = nil; resultTimer = nil
+        [aimingTimer, flightTimer, resultTimer, resetTimer].forEach { $0?.invalidate() }
+        aimingTimer = nil; flightTimer = nil; resultTimer = nil; resetTimer = nil
     }
 }
 
