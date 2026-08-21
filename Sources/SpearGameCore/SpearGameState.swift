@@ -24,6 +24,38 @@ public struct PresentationPoint: Equatable {
     public var normalized: Self { let length = length; return length > 0 ? self * (1 / length) : Self(x: 1, y: 0) }
 }
 
+/// Discrete source bands. Raw aiming is only a selector; runtime never interpolates asset poses.
+public enum MotionAssetBand: CaseIterable, Equatable {
+    case low25, mid45, high65
+    public var degrees: Double { switch self { case .low25: return 25; case .mid45: return 45; case .high65: return 65 } }
+    public var key: String { switch self { case .low25: return "low25"; case .mid45: return "mid45"; case .high65: return "high65" } }
+    public var aimFile: String { switch self { case .low25: return "aim-low-25.png"; case .mid45: return "aim-mid-45.png"; case .high65: return "aim-high-65.png" } }
+    public var releaseFiles: [String] { switch self { case .low25: return ["release-entry-low-25.png", "release-sweep-low-25-053.png", "release-sweep-low-25-107.png", "release-sweep-low-25-160.png"]; case .mid45: return ["release-entry-mid-45.png", "release-sweep-mid-45-053.png", "release-sweep-mid-45-107.png", "release-sweep-mid-45-160.png"]; case .high65: return ["release-entry-high-65.png", "release-sweep-high-65-053.png", "release-sweep-high-65-107.png", "release-sweep-high-65-160.png"] } }
+    public var releaseFrameOffsetsMs: [Int] { [0, 53, 107, 160] }
+    public static func forRawAim(_ degrees: Double) -> Self { degrees <= 35 ? .low25 : degrees <= 55 ? .mid45 : .high65 }
+    public func frameIndex(atReleaseElapsedMs milliseconds: Int) -> Int { releaseFrameOffsetsMs.lastIndex(where: { $0 <= milliseconds }) ?? 0 }
+}
+
+/// A frozen asset handoff. `flightStart` is y-up screen space; tangent is already converted from SVG y-down.
+public struct MotionAssetSnapshot: Equatable {
+    public let band: MotionAssetBand
+    public let finalP0: PresentationPoint
+    public let flightStart: PresentationPoint
+    public let flightTangentYUp: PresentationPoint
+    public let usesCodeFallback: Bool
+    public var flightAngleDegrees: Double { atan2(flightTangentYUp.y, flightTangentYUp.x) * 180 / .pi }
+    public init(band: MotionAssetBand, finalP0: PresentationPoint, flightStart: PresentationPoint, flightTangentYUp: PresentationPoint, usesCodeFallback: Bool) { self.band = band; self.finalP0 = finalP0; self.flightStart = flightStart; self.flightTangentYUp = flightTangentYUp.normalized; self.usesCodeFallback = usesCodeFallback }
+    public func withFlightStart(_ point: PresentationPoint) -> Self { Self(band: band, finalP0: point, flightStart: point, flightTangentYUp: flightTangentYUp, usesCodeFallback: usesCodeFallback) }
+    public static func fixture(_ band: MotionAssetBand) -> Self {
+        switch band {
+        case .low25: return Self(band: band, finalP0: PresentationPoint(x: 77, y: 57), flightStart: PresentationPoint(x: 77, y: 57), flightTangentYUp: PresentationPoint(x: 0.906308, y: 0.422618), usesCodeFallback: false)
+        case .mid45: return Self(band: band, finalP0: PresentationPoint(x: 76, y: 48), flightStart: PresentationPoint(x: 76, y: 48), flightTangentYUp: PresentationPoint(x: 0.707107, y: 0.707107), usesCodeFallback: false)
+        case .high65: return Self(band: band, finalP0: PresentationPoint(x: 72, y: 40), flightStart: PresentationPoint(x: 72, y: 40), flightTangentYUp: PresentationPoint(x: 0.422618, y: 0.906308), usesCodeFallback: false)
+        }
+    }
+    public static func fallback(for band: MotionAssetBand) -> Self { let source = fixture(band); return Self(band: band, finalP0: source.finalP0, flightStart: source.flightStart, flightTangentYUp: source.flightTangentYUp, usesCodeFallback: true) }
+}
+
 /// Pure y-up ballistic trajectory. Its position and velocity read only the frozen release snapshot.
 public struct BallisticFlightPath: Equatable {
     public static let gravity = 2400.0
@@ -54,6 +86,11 @@ public struct BallisticFlightPath: Equatable {
         vx = launchCoefficient * sqrt(Self.gravity * dx)
         vy = vx * tan(self.aimDegrees * .pi / 180)
         physicsDuration = dx / vx
+    }
+
+    /// Flight is initialized from the selected final asset frame, never from the raw continuous sweep geometry.
+    public init(start: PresentationPoint, targetX: Double, snapshot: MotionAssetSnapshot) {
+        self.init(start: start, targetX: targetX, aimDegrees: snapshot.flightAngleDegrees)
     }
 
     public static func coefficient(for degrees: Double) -> Double {

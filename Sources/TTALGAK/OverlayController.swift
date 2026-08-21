@@ -16,6 +16,7 @@ final class OverlayController {
     private var releaseElapsed = 0.0
     private var flightElapsed = 0.0
     private var flightPath: BallisticFlightPath?
+    private var frozenAssetSnapshot: MotionAssetSnapshot?
     private var targetCenter = PresentationPoint(x: 0, y: 0)
     private var finalTip = PresentationPoint(x: 0, y: 0)
 
@@ -39,11 +40,10 @@ final class OverlayController {
     func hide() { stopTimers(); hideFlight(); panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
 
     private func setupReadyTarget() {
-        guard let left = panels.first, let right = panels.last else { return }
-        let geometry = SpearPresentationGeometry(pose: .release, aimDegrees: game.target.canonicalAimDegrees)
-        let start = left.convertToScreen(NSRect(origin: geometry.flightStart.cgPoint, size: .zero)).origin
+        guard let left = panels.first?.contentView as? SpearThrowView, let right = panels.last else { return }
+        let snapshot = left.assetSnapshot(for: MotionAssetBand.forRawAim(game.target.canonicalAimDegrees))
         let targetX = Double(right.frame.minX + 132)
-        targetCenter = BallisticTarget.center(start: PresentationPoint(x: Double(start.x), y: Double(start.y)), targetX: targetX, position: game.target)
+        targetCenter = BallisticTarget.center(start: snapshot.flightStart, targetX: targetX, position: game.target)
         (right.contentView as? TargetView)?.targetPoint = right.convertFromScreen(NSRect(origin: targetCenter.cgPoint, size: .zero)).origin
     }
 
@@ -57,28 +57,34 @@ final class OverlayController {
             guard game.phase == .aiming else { return }
             game.release(); lifecycle.release(); aimingTimer?.invalidate()
             guard motionPolicy.showsFlightAnimation else { resolveFlight(hit: false); return }
-            freezeFlightSnapshot(); startFlight()
+            freezeFlightSnapshot(); startRelease()
         }
         render()
     }
     private func startAiming() { aimingTimer?.invalidate(); aimingTimer = Timer.scheduledTimer(withTimeInterval: motionPolicy.aimingUpdateInterval, repeats: true) { [weak self] _ in guard let self else { return }; self.game.advanceAim(by: self.motionPolicy.aimingUpdateInterval); self.render() } }
 
     private func freezeFlightSnapshot() {
-        guard let left = panels.first?.contentView as? SpearThrowView, let leftPanel = panels.first else { return }
-        let geometry = SpearPresentationGeometry(pose: .release, aimDegrees: left.aimDegrees)
-        let start = leftPanel.convertToScreen(NSRect(origin: geometry.flightStart.cgPoint, size: .zero)).origin
-        flightPath = BallisticFlightPath(start: PresentationPoint(x: start.x, y: start.y), targetX: targetCenter.x, aimDegrees: geometry.aimDegrees)
-        finalTip = flightPath?.sample(elapsed: BallisticFlightPath.visualDuration).tip ?? PresentationPoint(x: start.x, y: start.y)
+        guard let left = panels.first?.contentView as? SpearThrowView else { return }
+        let snapshot = left.assetSnapshot()
+        frozenAssetSnapshot = snapshot
+        flightPath = BallisticFlightPath(start: snapshot.flightStart, targetX: targetCenter.x, snapshot: snapshot)
+        finalTip = flightPath?.sample(elapsed: BallisticFlightPath.visualDuration).tip ?? snapshot.flightStart
     }
-    private func startFlight() { releaseElapsed = 0; flightElapsed = 0; flightTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() } }
+    private func startRelease() {
+        releaseElapsed = 0
+        (panels.first?.contentView as? SpearThrowView)?.playReleaseFrames()
+        DispatchQueue.main.asyncAfter(deadline: .now() + presentationPolicy.launchDuration) { [weak self] in
+            guard let self, !self.panels.isEmpty, self.lifecycle.phase == .release else { return }
+            self.releaseElapsed = self.presentationPolicy.launchDuration
+            self.lifecycle.advance(by: self.presentationPolicy.launchDuration)
+            self.showFlightPanel()
+            self.startFlight()
+            self.render()
+        }
+    }
+    private func startFlight() { flightElapsed = 0; flightTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() } }
     private func advanceFlight() {
         let step = 1.0 / 60.0
-        if lifecycle.phase == .release {
-            releaseElapsed += step; lifecycle.advance(by: step)
-            (panels.first?.contentView as? SpearThrowView)?.releaseProgress = min(releaseElapsed / presentationPolicy.launchDuration, 1)
-            if lifecycle.phase == .flying { showFlightPanel() }
-            render(); return
-        }
         guard lifecycle.phase == .flying, let path = flightPath else { return }
         let previous = flightElapsed; flightElapsed = min(flightElapsed + step, BallisticFlightPath.visualDuration)
         if let impact = SpearCollision.firstImpact(path: path, target: targetCenter, fromElapsed: previous, toElapsed: flightElapsed) { flightElapsed = impact; (flightPanel?.contentView as? FlightView)?.elapsed = impact; resolveFlight(hit: true); return }
@@ -92,9 +98,12 @@ final class OverlayController {
         let panel = FlightPanel(frame: screen.frame, contract: .visibilityOnly); let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size)); flight.path = path; flight.elapsed = 0; panel.contentView = flight; flightPanel = panel; panel.orderFrontRegardless()
     }
     private func resolveFlight(hit: Bool) {
-        flightTimer?.invalidate(); flightTimer = nil; game.resolveFlight(hit: hit); render()
+        flightTimer?.invalidate(); flightTimer = nil
+        // Accepted M-01/M-02 contract: remove the visibility-only flight layer at impact; TargetView owns the result cue.
+        hideFlight()
+        game.resolveFlight(hit: hit); render()
         let resultDuration = presentationPolicy.showsFlightTranslation ? presentationPolicy.impactDuration + presentationPolicy.resultHoldDuration : presentationPolicy.staticResultDuration
-        resultTimer = Timer.scheduledTimer(withTimeInterval: resultDuration, repeats: false) { [weak self] _ in guard let self else { return }; self.hideFlight(); self.resetTimer = Timer.scheduledTimer(withTimeInterval: self.presentationPolicy.resetDuration, repeats: false) { [weak self] _ in guard let self else { return }; self.game.finishRound(); self.lifecycle = PresentationLifecycle(policy: self.presentationPolicy); self.setupReadyTarget(); self.render() } }
+        resultTimer = Timer.scheduledTimer(withTimeInterval: resultDuration, repeats: false) { [weak self] _ in guard let self else { return }; self.resetTimer = Timer.scheduledTimer(withTimeInterval: self.presentationPolicy.resetDuration, repeats: false) { [weak self] _ in guard let self else { return }; self.game.finishRound(); self.lifecycle = PresentationLifecycle(policy: self.presentationPolicy); self.frozenAssetSnapshot = nil; self.setupReadyTarget(); self.render() } }
     }
     private func hideFlight() { guard FlightLayerContract.visibilityOnly.removesAtImpact else { return }; flightPanel?.orderOut(nil); flightPanel = nil }
     private func render() { let left = panels.first?.contentView as? SpearThrowView; left?.state = game; left?.pose = lifecycle.pose; left?.aimDegrees = game.angleDegrees; let right = panels.last?.contentView as? TargetView; right?.state = game; right?.finalTip = (panels.last?.convertFromScreen(NSRect(origin: finalTip.cgPoint, size: .zero)).origin ?? .zero) }

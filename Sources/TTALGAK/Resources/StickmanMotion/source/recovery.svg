@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 110" width="180" height="110" role="img" aria-labelledby="title desc">
+  <title id="title">TTALGAK stickman recovery</title><desc id="desc">Original black-only transparent recovery pose without a spear or flight path.</desc>
+  <metadata>{"asset":"TTALGAK","pose":"Recovery","artboard":"180x110","bodyOrigin":[48,80],"handAnchor":[61,63],"heldSpearPreview":"hidden","durationMs":220}</metadata>
+  <g id="stickman" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle id="head" cx="49" cy="34" r="6"/><path id="torso" d="M49 40 L48 77 M49 49 L61 63 M48 77 L39 94 M48 77 L57 94"/><path id="throw-arm" d="M49 49 L57 57 L61 63"/><path id="rest-arm" d="M49 49 L40 62"/></g><g id="held-spear-preview" display="none"/>
+</svg>

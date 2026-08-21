@@ -1,8 +1,25 @@
 #!/usr/bin/env python3
 """Linux-safe static guardrail; macOS/AppKit runtime remains Mac QA only."""
 from pathlib import Path
+import json
 
 root = Path(__file__).resolve().parents[1]
+resources = root / "Sources" / "TTALGAK" / "Resources" / "StickmanMotion"
+manifest_path = resources / "asset-manifest.json"
+assert manifest_path.exists(), "RED: tracked stickman manifest is required"
+manifest = json.loads(manifest_path.read_text())
+assert manifest["artboard"]["logicalUnits"] == {"width": 180, "height": 110}
+assert manifest["releaseSweepSequences"]["durationMs"] == 160
+for band, degree in (("low25", 25), ("mid45", 45), ("high65", 65)):
+    sequence = manifest["releaseSweepSequences"][band]["frameOrder"]
+    assert len(sequence) == 4 and sequence[0].startswith("release-entry-") and sequence[-1].endswith("-160.svg")
+    for frame in sequence:
+        assert (resources / "source" / frame).exists(), f"missing tracked SVG {frame}"
+        assert (resources / "runtime" / (Path(frame).stem + ".png")).exists(), f"missing runtime PNG {frame}"
+    final = manifest["releaseSweepSequences"][band]["contact"]["final"]
+    assert final["hand"] == final["tail"] == final["ballisticP0"]
+    assert degree in (25, 45, 65)
+
 package = (root / "Package.swift").read_text()
 overlay = (root / "Sources/TTALGAK/OverlayController.swift").read_text()
 view = (root / "Sources/TTALGAK/SpearThrowView.swift").read_text()
@@ -13,6 +30,7 @@ tests = (root / "Tests/SpearGameStateTests.swift").read_text()
 all_source = "\n".join(path.read_text() for path in (root / "Sources").rglob("*.swift"))
 
 assert '.macOS(.v13)' in package and '.target(name: "SpearGameCore")' in package
+assert '.copy("Resources/StickmanMotion")' in package
 assert 'NSStatusBar.system.statusItem' in app
 assert 'width: 180, height: 110' in overlay and overlay.count('GamePanel(frame: .zero, interaction:') == 2
 assert 'frame.minY + min(max(frame.height * 0.08, 72), 120)' in overlay
@@ -26,8 +44,11 @@ assert 'path.sample(elapsed: elapsed)' in view and 'var targetPoint' in view and
 assert 'NSColor.black' in view and 'let origin = NSPoint(x: 48, y: 33)' in view
 assert 'lineWidth = 3' in view and 'lineWidth = 3.5' in view
 assert 'showsFlightTranslation: false' in core and 'staticResultDuration: 0.5' in core
-for expected in ('testCanonicalTargetSetupMatchesBallisticTailAtImpact', 'testBallisticLaunchApexAndDescentUseVelocityOnly', 'testCollisionSamplesShaftWithFourPointMaximumSubsteps', 'testCollisionIsTheOnlyOutcomeAuthority', 'testReleaseHandMovesContinuouslyWithoutBodyCrossAndFlightStartsAtFinalHand'):
+for expected in ('testCanonicalTargetSetupMatchesBallisticTailAtImpact', 'testBallisticLaunchApexAndDescentUseVelocityOnly', 'testCollisionSamplesShaftWithFourPointMaximumSubsteps', 'testCollisionIsTheOnlyOutcomeAuthority', 'testReleaseHandMovesContinuouslyWithoutBodyCrossAndFlightStartsAtFinalHand', 'testDiscreteBandFreezesAssetTangentAndFinalP0ForBallistics', 'testReleaseSequenceUsesDiscreteAssetFramesAtExactOffsets', 'testFallbackSnapshotStaysCodeDrawnAndNeverBlank'):
     assert expected in tests
+for expected in ('enum MotionAssetBand', 'struct MotionAssetSnapshot', 'forRawAim', 'releaseFrameOffsetsMs', 'init(start: PresentationPoint, targetX: Double, snapshot: MotionAssetSnapshot)', 'CAKeyframeAnimation(keyPath: "contents")', 'entry → 053 → 107 → 160', 'StickmanMotionAssets', 'usesAssetFrame', 'BallisticFlightPath(start: snapshot.flightStart, targetX: targetCenter.x, snapshot: snapshot)', 'hideFlight()'):
+    assert expected in all_source
+assert 'SpearPresentationGeometry(pose: .release, aimDegrees: left.aimDegrees)' not in overlay
 for forbidden in ('ScreenCaptureKit', 'CGWindowList', 'AXUIElement', 'CGEventTap', 'CGEventPost', 'URLSession', 'NSPasteboard', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'CGRequestScreenCaptureAccess', 'CGDisplayStream', 'CGWindowImage'):
     assert forbidden not in all_source
 assert 'ballistic' in readme.lower() and 'Linux static validation' in readme

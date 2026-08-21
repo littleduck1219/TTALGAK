@@ -80,4 +80,32 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(FlightLayerContract.visibilityOnly.ignoresMouseEvents, true)
         XCTAssertEqual(AnchorInteraction.displayOnly.ignoresMouseEvents, true)
     }
+
+    func testDiscreteBandFreezesAssetTangentAndFinalP0ForBallistics() {
+        XCTAssertEqual(MotionAssetBand.forRawAim(20), .low25)
+        XCTAssertEqual(MotionAssetBand.forRawAim(45), .mid45)
+        XCTAssertEqual(MotionAssetBand.forRawAim(70), .high65)
+        let snapshot = MotionAssetSnapshot.fixture(.mid45)
+        let path = BallisticFlightPath(start: snapshot.flightStart, targetX: 1232, snapshot: snapshot)
+        XCTAssertEqual(path.aimDegrees, 45, accuracy: 0.001)
+        XCTAssertEqual(path.start, snapshot.flightStart)
+        XCTAssertEqual(path.sample(elapsed: 0).shaftAngleDegrees, snapshot.flightAngleDegrees, accuracy: 0.001)
+    }
+
+    func testReleaseSequenceUsesDiscreteAssetFramesAtExactOffsets() {
+        XCTAssertEqual(MotionAssetBand.low25.releaseFrameOffsetsMs, [0, 53, 107, 160])
+        XCTAssertEqual(MotionAssetBand.mid45.releaseFrameOffsetsMs, [0, 53, 107, 160])
+        XCTAssertEqual(MotionAssetBand.high65.releaseFrameOffsetsMs, [0, 53, 107, 160])
+        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 0), 0)
+        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 53), 1)
+        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 107), 2)
+        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 160), 3)
+    }
+
+    func testFallbackSnapshotStaysCodeDrawnAndNeverBlank() {
+        let snapshot = MotionAssetSnapshot.fallback(for: .high65)
+        XCTAssertTrue(snapshot.usesCodeFallback)
+        XCTAssertEqual(snapshot.band, .high65)
+        XCTAssertEqual(snapshot.flightStart, snapshot.finalP0)
+    }
 }

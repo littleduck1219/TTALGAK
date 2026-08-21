@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 110" width="180" height="110" role="img" aria-labelledby="title desc">
+  <title id="title">TTALGAK stickman release entry low 25 degrees</title><desc id="desc">Release entry snapshot geometrically identical to the final low aim frame.</desc>
+  <metadata>{"asset":"TTALGAK","pose":"Release","releaseEntryFor":"Aim-low-25","aimDegrees":25,"snapshotRule":"identical handAnchor, shaftTail, shaftTangent to final Aim-low-25","bodyOrigin":[48,80],"handAnchor":[68,55],"shaftTail":[68,55],"shaftTangent":[0.906308,-0.422618]}</metadata>
+  <g id="stickman" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle id="head" cx="46" cy="34" r="6"/><path id="torso" d="M46 40 L48 77 M47 49 L39 61 M48 77 L39 94 M48 77 L57 94"/><path id="throw-arm" d="M47 49 L56 59 L68 55"/><path id="rest-arm" d="M47 49 L38 60"/></g><g id="held-spear-preview" fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round"><path id="shaft" d="M68 55 L106.07 37.25" stroke-width="3"/><path id="tip" d="M106.07 37.25 L100.18 37.68 M106.07 37.25 L102.76 42.16" stroke-width="2.5"/></g>
+</svg>

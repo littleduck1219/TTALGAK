@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1.0",
+  "assetId": "TTALGAK-stickman-motion-v0.1",
+  "title": "TTALGAK internal transparent SVG stickman motion frames",
+  "author": "Maggie / Littleducks's Company",
+  "createdAt": "2026-08-21T00:36:00Z",
+  "artboard": {
+    "logicalUnits": { "width": 180, "height": 110 },
+    "coordinateSystem": "SVG top-left, x-right, y-down",
+    "runtimeMapping": "1 SVG logical unit = 1 AppKit pt; aspect-fit is forbidden",
+    "background": "transparent; no background element"
+  },
+  "visualContract": {
+    "subject": "one minimalist stickman and held-spear preview only",
+    "ink": "#000000 at alpha 1.0 only",
+    "prohibited": ["box", "card", "text rendered on canvas", "target", "baked flight", "shadow", "gradient", "opacity effect"],
+    "strokes": { "stickman": 3, "heldShaft": 3, "heldTip": 2.5, "linecap": "round", "linejoin": "round" },
+    "bodyOrigin": [48, 80],
+    "boundsRule": "Every declared visual bound includes the outer stroke extent and lies inside [0,180] x [0,110]."
+  },
+  "namedSvgGroups": ["stickman", "head", "torso", "throw-arm", "rest-arm", "held-spear-preview", "shaft", "tip"],
+  "frames": [
+    { "file": "ready.svg", "pose": "Ready", "visibleBounds": [37.5, 27, 102.62, 95.5], "handAnchor": [65, 60], "shaftTail": [65, 60], "shaftTangent": [0.866025, -0.5], "heldSpear": true },
+    { "file": "aim-low-25.svg", "pose": "Aim-low", "aimDegrees": 25, "visibleBounds": [35.5, 27, 107.32, 95.5], "handAnchor": [68, 55], "shaftTail": [68, 55], "shaftTip": [106.07, 37.25], "shaftTangent": [0.906308, -0.422618], "heldSpear": true },
+    { "file": "aim-mid-45.svg", "pose": "Aim-mid", "aimDegrees": 45, "visibleBounds": [34.5, 16.05, 97.95, 95.5], "handAnchor": [67, 47], "shaftTail": [67, 47], "shaftTip": [96.7, 17.3], "shaftTangent": [0.707107, -0.707107], "heldSpear": true },
+    { "file": "aim-high-65.svg", "pose": "Aim-high", "aimDegrees": 65, "visibleBounds": [34.5, 0.5, 84, 95.5], "handAnchor": [64, 40], "shaftTail": [64, 40], "shaftTip": [81.75, 1.93], "shaftTangent": [0.422618, -0.906308], "heldSpear": true },
+    { "file": "release-entry-low-25.svg", "pose": "Release", "releaseEntryFor": "aim-low-25.svg", "visibleBounds": [35.5, 27, 107.32, 95.5], "handAnchor": [68, 55], "shaftTail": [68, 55], "shaftTangent": [0.906308, -0.422618], "heldSpear": true },
+    { "file": "release-entry-mid-45.svg", "pose": "Release", "releaseEntryFor": "aim-mid-45.svg", "visibleBounds": [34.5, 16.05, 97.95, 95.5], "handAnchor": [67, 47], "shaftTail": [67, 47], "shaftTangent": [0.707107, -0.707107], "heldSpear": true },
+    { "file": "release-entry-high-65.svg", "pose": "Release", "releaseEntryFor": "aim-high-65.svg", "visibleBounds": [34.5, 0.5, 84, 95.5], "handAnchor": [64, 40], "shaftTail": [64, 40], "shaftTangent": [0.422618, -0.906308], "heldSpear": true },
+    { "file": "recovery.svg", "pose": "Recovery", "visibleBounds": [37.5, 27, 62.5, 95.5], "handAnchor": [61, 63], "heldSpear": false },
+    { "file": "release-sweep-low-25-053.svg", "pose": "Release-sweep", "aimDegrees": 25, "frameOffsetMs": 53, "visibleBounds": [35.5, 27, 111, 95.5], "handAnchor": [71, 56], "shaftTail": [71, 56], "shaftTangent": [0.906308, -0.422618], "heldSpear": true },
+    { "file": "release-sweep-low-25-107.svg", "pose": "Release-sweep", "aimDegrees": 25, "frameOffsetMs": 107, "visibleBounds": [35.5, 27, 114, 95.5], "handAnchor": [74, 57], "shaftTail": [74, 57], "shaftTangent": [0.906308, -0.422618], "heldSpear": true },
+    { "file": "release-sweep-low-25-160.svg", "pose": "Release-final", "aimDegrees": 25, "frameOffsetMs": 160, "visibleBounds": [35.5, 27, 117, 95.5], "handAnchor": [77, 57], "shaftTail": [77, 57], "shaftTangent": [0.906308, -0.422618], "ballisticP0": [77, 57], "heldSpear": true },
+    { "file": "release-sweep-mid-45-053.svg", "pose": "Release-sweep", "aimDegrees": 45, "frameOffsetMs": 53, "visibleBounds": [34.5, 16, 102, 95.5], "handAnchor": [70, 47], "shaftTail": [70, 47], "shaftTangent": [0.707107, -0.707107], "heldSpear": true },
+    { "file": "release-sweep-mid-45-107.svg", "pose": "Release-sweep", "aimDegrees": 45, "frameOffsetMs": 107, "visibleBounds": [34.5, 16, 105, 95.5], "handAnchor": [73, 48], "shaftTail": [73, 48], "shaftTangent": [0.707107, -0.707107], "heldSpear": true },
+    { "file": "release-sweep-mid-45-160.svg", "pose": "Release-final", "aimDegrees": 45, "frameOffsetMs": 160, "visibleBounds": [34.5, 16, 108, 95.5], "handAnchor": [76, 48], "shaftTail": [76, 48], "shaftTangent": [0.707107, -0.707107], "ballisticP0": [76, 48], "heldSpear": true },
+    { "file": "release-sweep-high-65-053.svg", "pose": "Release-sweep", "aimDegrees": 65, "frameOffsetMs": 53, "visibleBounds": [34.5, 0.5, 87, 95.5], "handAnchor": [67, 39], "shaftTail": [67, 39], "shaftTangent": [0.422618, -0.906308], "heldSpear": true },
+    { "file": "release-sweep-high-65-107.svg", "pose": "Release-sweep", "aimDegrees": 65, "frameOffsetMs": 107, "visibleBounds": [34.5, 0.5, 89, 95.5], "handAnchor": [69, 40], "shaftTail": [69, 40], "shaftTangent": [0.422618, -0.906308], "heldSpear": true },
+    { "file": "release-sweep-high-65-160.svg", "pose": "Release-final", "aimDegrees": 65, "frameOffsetMs": 160, "visibleBounds": [34.5, 0.5, 92, 95.5], "handAnchor": [72, 40], "shaftTail": [72, 40], "shaftTangent": [0.422618, -0.906308], "ballisticP0": [72, 40], "heldSpear": true }
+  ],
+  "releaseSweepSequences": {
+    "durationMs": 160,
+    "timing": "standard ease-out; source frame sampling is 0/53/107/160ms",
+    "torsoCrossingRule": "The throwing-side hand remains right of torso centerline x=48 for every declared contact and for each explicit cubic hand path.",
+    "codeFlightBoundary": "The held preview remains visible through each 160ms final source frame. On the next compositor boundary only, hide it and show exactly one code-flight spear from final ballisticP0 with the same shaftTangent.",
+    "low25": { "frameOrder": ["release-entry-low-25.svg", "release-sweep-low-25-053.svg", "release-sweep-low-25-107.svg", "release-sweep-low-25-160.svg"], "contact": { "entry": { "hand": [68,55], "tail": [68,55], "tangent": [0.906308,-0.422618] }, "mid": { "hand": [74,57], "tail": [74,57], "tangent": [0.906308,-0.422618] }, "final": { "hand": [77,57], "tail": [77,57], "tangent": [0.906308,-0.422618], "ballisticP0": [77,57] } }, "handPath": { "svgYDownCubic": "M68 55 C70 54 74 56 77 57", "xRange": [68,77], "neverCrossesTorsoCenterlineX": 48 } },
+    "mid45": { "frameOrder": ["release-entry-mid-45.svg", "release-sweep-mid-45-053.svg", "release-sweep-mid-45-107.svg", "release-sweep-mid-45-160.svg"], "contact": { "entry": { "hand": [67,47], "tail": [67,47], "tangent": [0.707107,-0.707107] }, "mid": { "hand": [73,48], "tail": [73,48], "tangent": [0.707107,-0.707107] }, "final": { "hand": [76,48], "tail": [76,48], "tangent": [0.707107,-0.707107], "ballisticP0": [76,48] } }, "handPath": { "svgYDownCubic": "M67 47 C70 46 73 48 76 48", "xRange": [67,76], "neverCrossesTorsoCenterlineX": 48 } },
+    "high65": { "frameOrder": ["release-entry-high-65.svg", "release-sweep-high-65-053.svg", "release-sweep-high-65-107.svg", "release-sweep-high-65-160.svg"], "contact": { "entry": { "hand": [64,40], "tail": [64,40], "tangent": [0.422618,-0.906308] }, "mid": { "hand": [69,40], "tail": [69,40], "tangent": [0.422618,-0.906308] }, "final": { "hand": [72,40], "tail": [72,40], "tangent": [0.422618,-0.906308], "ballisticP0": [72,40] } }, "handPath": { "svgYDownCubic": "M64 40 C67 38 69 40 72 40", "xRange": [64,72], "neverCrossesTorsoCenterlineX": 48 } }
+  },
+  "releaseMatchingRule": {
+    "entry": "For the selected discrete aim band, render the matching release-entry SVG without interpolation at t=0. Its handAnchor, shaftTail, and shaftTangent are numerically identical to the final visible Aim snapshot.",
+    "flightBoundary": "After the selected 160ms release-sweep final source frame, snapshot final ballisticP0/shaftTail/tangent, convert y-down tangent (x,y) to y-up u0=(x,-y), set flight P0 to the same final hand/tail contact, then hide held-spear-preview on the code-flight compositor boundary. Draw exactly one code-driven flight spear.",
+    "continuityAcceptance": "hand/tail positional delta <= 0.5pt; normalized tangent dot product >= 0.999999. Do not substitute a default angle if the match fails."
+  },
+  "coreAnimationIntent": {
+    "standardSequence": [
+      { "state": "Ready", "durationMs": 0, "rule": "static initial frame" },
+      { "state": "Aim", "durationMs": 600, "rule": "map live hold to 25/45/65 fallback frames; continuous interpolation is an implementation enhancement, not assumed by this asset set" },
+      { "state": "Release", "durationMs": 160, "timing": "standard ease-out", "rule": "use selected release-entry → 053ms → 107ms → 160ms release-sweep source order; held preview remains visible through final source frame" },
+      { "state": "Code flight", "durationMs": 820, "timing": "standard ease-in-out", "rule": "not baked into these SVGs" },
+      { "state": "Impact", "durationMs": 140, "rule": "outside asset scope" },
+      { "state": "Result hold", "durationMs": 360, "rule": "outside asset scope" },
+      { "state": "Recovery", "durationMs": 220, "timing": "standard ease-in-out", "rule": "recovery.svg to ready.svg; no bounce, spin, fade, or added effects" }
+    ],
+    "reducedMotion": "No Core Animation pose tween, code-flight translation, rotation, scale, body shift, or fade. Frink retains the existing static 300ms aim step / 500ms result policy."
+  },
+  "integrationBoundary": {
+    "nativeSvgRuntimeConfirmed": false,
+    "delivery": "Editable SVG source and manifest are the integration-ready asset set.",
+    "frinkResponsibility": "If AppKit/Core Animation cannot render these SVGs directly, raster/PDF conversion, resource-bundle inclusion, runtime lookup, fallback, and macOS verification belong to Professor Frink. This task does not create converted runtime assets or modify app code.",
+    "fallback": "Retain code-drawn black-only stickman when asset load, bounds, or continuity validation fails."
+  },
+  "provenance": {
+    "origin": "Original internal vector artwork authored manually by Maggie for Littleducks's Company / TTALGAK, including the v0.1 continuous forward arm-sweep correction.",
+    "externalAssets": "None. No marketplace, download, generated-image asset, external account, or external source was used.",
+    "license": "Copyright 2026 Littleducks's Company. Internal TTALGAK use only; no third-party asset license applies.",
+    "sourceDecision": "/home/littleduck/.hermes/company/ttalgak/TTALGAK-macOS-스틱맨-모션-asset-결정.md",
+    "correctionKanban": "t_04286438",
+    "evidence": "continuous-arm-sweep-evidence.md",
+    "validation": "structural-validation-arm-sweep.json",
+    "aiOsHandoffRecord": "ai-os-record-arm-sweep-v0.1.md"
+  }
+}

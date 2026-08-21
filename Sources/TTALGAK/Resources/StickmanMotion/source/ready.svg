@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 110" width="180" height="110" role="img" aria-labelledby="title desc">
+  <title id="title">TTALGAK stickman ready</title><desc id="desc">Original black-only transparent ready pose with held spear preview.</desc>
+  <metadata>{"asset":"TTALGAK","pose":"Ready","artboard":"180x110","bodyOrigin":[48,80],"handAnchor":[65,60],"shaftTail":[65,60],"shaftTangent":[0.866025,-0.5]}</metadata>
+  <g id="stickman" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <circle id="head" cx="48" cy="34" r="6"/><path id="torso" d="M48 40 L48 77 M48 49 L61 63 M48 77 L39 94 M48 77 L57 94"/>
+    <path id="throw-arm" d="M48 49 L56 58 L65 60"/><path id="rest-arm" d="M48 49 L40 62"/>
+  </g><g id="held-spear-preview" fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round"><path id="shaft" d="M65 60 L101.37 39" stroke-width="3"/><path id="tip" d="M101.37 39 L95.5 39.4 M101.37 39 L98 44" stroke-width="2.5"/></g>
+</svg>

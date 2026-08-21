@@ -6,17 +6,73 @@ private let ink = NSColor.black
 final class SpearThrowView: NSView {
     enum Event { case press, release }
     var state = SpearGameState() { didSet { needsDisplay = true } }
-    var pose = StickmanPose.ready { didSet { needsDisplay = true } }
-    var aimDegrees = 45.0 { didSet { needsDisplay = true } }
-    var releaseProgress = 1.0 { didSet { needsDisplay = true } }
+    var pose = StickmanPose.ready { didSet { updateAssetFrame(); needsDisplay = true } }
+    var aimDegrees = 45.0 { didSet { updateAssetFrame(); needsDisplay = true } }
+    var releaseProgress = 1.0 { didSet { updateAssetFrame(); needsDisplay = true } }
     private let onEvent: (Event) -> Void
-    init(frame: NSRect, onEvent: @escaping (Event) -> Void) { self.onEvent = onEvent; super.init(frame: frame) }
+    private let assets = StickmanMotionAssets()
+    private let assetLayer = CALayer()
+    private var usesAssetFrame = false
+
+    init(frame: NSRect, onEvent: @escaping (Event) -> Void) {
+        self.onEvent = onEvent
+        super.init(frame: frame)
+        wantsLayer = true
+        assetLayer.contentsGravity = .resize
+        layer?.addSublayer(assetLayer)
+        updateAssetFrame()
+    }
     required init?(coder: NSCoder) { nil }
+    override func layout() { super.layout(); assetLayer.frame = bounds; assetLayer.contentsScale = window?.backingScaleFactor ?? 1 }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) { onEvent(.press) }
     override func mouseUp(with event: NSEvent) { onEvent(.release) }
-    override func draw(_ dirtyRect: NSRect) { drawStickman(geometry: geometry) }
+    override func draw(_ dirtyRect: NSRect) { if !usesAssetFrame { drawStickman(geometry: geometry) } }
     var geometry: SpearPresentationGeometry { SpearPresentationGeometry(pose: pose, aimDegrees: aimDegrees) }
+    var selectedBand: MotionAssetBand { MotionAssetBand.forRawAim(aimDegrees) }
+    func assetSnapshot() -> MotionAssetSnapshot { assetSnapshot(for: selectedBand) }
+    func assetSnapshot(for band: MotionAssetBand) -> MotionAssetSnapshot {
+        if let snapshot = assets?.snapshot(for: band, in: self) { return snapshot }
+        let fallback = MotionAssetSnapshot.fallback(for: band)
+        let local = NSPoint(x: fallback.finalP0.x, y: 110 - fallback.finalP0.y)
+        let screen = convertToScreen(NSRect(origin: local, size: .zero)).origin
+        return fallback.withFlightStart(PresentationPoint(x: screen.x, y: screen.y))
+    }
+
+    /// Core Animation switches only the selected discrete source frames: entry → 053 → 107 → 160 over 160ms.
+    func playReleaseFrames() {
+        guard let assets, let images = selectedBand.releaseFiles.compactMap({ assets.image(named: $0) as NSImage? }), images.count == 4 else { return }
+        let cgImages = images.compactMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
+        guard cgImages.count == 4 else { return }
+        assetLayer.contents = cgImages[3]
+        let animation = CAKeyframeAnimation(keyPath: "contents")
+        animation.values = cgImages
+        animation.keyTimes = [0, 0.33125, 0.66875, 1]
+        animation.duration = 0.160
+        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        assetLayer.add(animation, forKey: "ttalgak.release.frames")
+        usesAssetFrame = true
+    }
+
+    private func updateAssetFrame() {
+        guard let assets else { showFallback(); return }
+        let name: String
+        switch pose {
+        case .ready: name = "ready.png"
+        case .aiming: name = selectedBand.aimFile
+        case .release:
+            let milliseconds = Int((min(max(releaseProgress, 0), 1) * 160).rounded())
+            name = selectedBand.releaseFiles[selectedBand.frameIndex(atReleaseElapsedMs: milliseconds)]
+        case .flying, .recovery: name = "recovery.png" // held preview is hidden before the code-flight boundary.
+        }
+        guard let image = assets.image(named: name), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { showFallback(); return }
+        assetLayer.removeAnimation(forKey: "ttalgak.release.frames")
+        assetLayer.contents = cgImage
+        usesAssetFrame = true
+        needsDisplay = true
+    }
+
+    private func showFallback() { assetLayer.removeAllAnimations(); assetLayer.contents = nil; usesAssetFrame = false; needsDisplay = true }
 
     private func drawStickman(geometry: SpearPresentationGeometry) {
         let origin = NSPoint(x: 48, y: 33); let pose = geometry.pose; ink.setStroke()
