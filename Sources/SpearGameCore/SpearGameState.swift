@@ -48,6 +48,10 @@ public enum DragLaunch {
         let tangent = tangent(angleDegrees: angleDegrees)
         return power(reverse: max(0, -(displacement.x * tangent.x + displacement.y * tangent.y)))
     }
+    // Visible tension reads the raw frozen-axis pull, not normalized power: a full 320pt pull renders 160pt.
+    public static func tensionLength(rawPull: Double) -> Double {
+        rawPull <= 6 ? 0 : min(max(rawPull / 320 * 160, 0), 160)
+    }
 }
 
 public struct GroundSpearRecord: Equatable {
@@ -98,10 +102,12 @@ public struct TargetLifecycle {
 public struct FrozenLaunch: Equatable {
     public let angleDegrees: Double
     public let power: Double
+    public let rawPull: Double
     public let start: PresentationPoint
-    public init(angleDegrees: Double, power: Double, start: PresentationPoint) {
+    public init(angleDegrees: Double, power: Double, rawPull: Double = 0, start: PresentationPoint) {
         self.angleDegrees = min(max(angleDegrees, 10), 65)
         self.power = min(max(power, 0), 1)
+        self.rawPull = max(rawPull, 0)
         self.start = start
     }
 }
@@ -126,9 +132,9 @@ public struct LocalGesture: Equatable {
             latchedTangent = DragLaunch.tangent(angleDegrees: angle)
         }
         // Displacement decomposes as a*latchedTangent + b*(0,1): pull power reads only a = dx/tangent.x,
-        // so vertical (angle-only) moves can never shrink or grow a latched power.
-        let power = latchedTangent.map { DragLaunch.power(reverse: -displacement.x / $0.x) } ?? 0
-        let value = FrozenLaunch(angleDegrees: angle, power: power, start: start)
+        // so vertical (angle-only) moves can never shrink or grow a latched power or its raw pull distance.
+        let rawPull = latchedTangent.map { max(0, -displacement.x / $0.x) } ?? 0
+        let value = FrozenLaunch(angleDegrees: angle, power: DragLaunch.power(reverse: rawPull), rawPull: rawPull, start: start)
         launch = value
         return value
     }

@@ -48,7 +48,8 @@ assert 'tangent(angleDegrees: 25)' not in tests
 # Power latch: first 6pt dead-zone crossing freezes the tangent; afterwards power is measured only along
 # that frozen axis (-dx / tangent.x). Per-current-angle re-projection of power on every move must fail.
 assert 'latchedTangent' in core
-assert 'DragLaunch.power(reverse: -displacement.x / $0.x)' in core
+assert 'latchedTangent.map { max(0, -displacement.x / $0.x) }' in core
+assert 'DragLaunch.power(reverse: rawPull)' in core
 assert 'latchedTangent = DragLaunch.tangent(angleDegrees: angle)' in core
 assert 'latchedTangent = nil' in core
 assert 'power: DragLaunch.power(displacement: displacement, angleDegrees: angle)' not in core
@@ -58,6 +59,22 @@ assert 'testFrozenAxisFullPullReachesExactMaxAtThreeTwenty' in tests
 assert 'testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower' in tests
 assert 'XCTAssertEqual(raised?.power, latched?.power)' in tests
 assert 'XCTAssertEqual(lowered?.power, latched?.power)' in tests
+
+# Visible pull: the latched raw pull-axis distance is retained on FrozenLaunch and rendered proportionally
+# (tension = clamp(rawPull/320*160, 0, 160), hidden inside the 6pt dead zone). The old 6+24*power (30pt max)
+# tension mapping must fail, and the hand/launch P0 must stay fixed so flight starts with no discontinuity.
+assert 'public let rawPull: Double' in core
+assert 'self.rawPull = max(rawPull, 0)' in core
+assert 'rawPull <= 6 ? 0 : min(max(rawPull / 320 * 160, 0), 160)' in core
+assert 'rawPull: rawPull' in core
+assert 'DragLaunch.tensionLength(rawPull: launch.rawPull)' in view
+assert '6 + 24 * launch.power' not in view
+assert 'guard launch.power > 0' not in view
+assert 'drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming)' in view
+assert 'testRawPullMapsProportionallyToVisibleTension' in tests
+assert 'testVerticalAngleOnlyMovePreservesRawPullAndVisibleTension' in tests
+assert 'testFurtherFrozenAxisPullGrowsRawPullVisibleTensionAndPower' in tests
+assert 'tensionLength(rawPull: 160), 80' in tests and 'tensionLength(rawPull: 320), 160' in tests
 
 # In-memory ground-miss FIFO (50, oldest evicted); hits never retained; renderer draws stored spears, no ground line.
 assert 'GroundSpearInventory' in core and 'capacity = 50' in core and 'guard !hit else { return }' in core

@@ -51,8 +51,9 @@ final class SceneView: NSView {
         let end = NSPoint(x: hand.x + CGFloat(t.x * 42), y: hand.y + CGFloat(t.y * 42))
         let arm = NSBezierPath(); arm.move(to: NSPoint(x: hand.x - 8, y: hand.y + 2)); arm.line(to: hand); arm.lineWidth = 3; arm.stroke()
         let spear = NSBezierPath(); spear.move(to: hand); spear.line(to: end); spear.lineWidth = 3; spear.lineCapStyle = .round; spear.stroke()
-        guard launch.power > 0 else { return }
-        let length = 6 + 24 * launch.power; let tension = NSBezierPath(); tension.move(to: hand); tension.line(to: NSPoint(x: hand.x - CGFloat(t.x * length), y: hand.y - CGFloat(t.y * length))); tension.lineWidth = 2; tension.lineCapStyle = .round; tension.stroke()
+        let length = DragLaunch.tensionLength(rawPull: launch.rawPull)
+        guard length > 0 else { return }
+        let tension = NSBezierPath(); tension.move(to: hand); tension.line(to: NSPoint(x: hand.x - CGFloat(t.x * length), y: hand.y - CGFloat(t.y * length))); tension.lineWidth = 2; tension.lineCapStyle = .round; tension.stroke()
     }
     private func drawSpear(path: BallisticFlightPath, elapsed: Double) {
         let sample = path.sample(elapsed: elapsed)
