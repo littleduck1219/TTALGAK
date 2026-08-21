@@ -7,7 +7,7 @@ let package = Package(
     products: [.executable(name: "TTALGAK", targets: ["TTALGAK"])],
     targets: [
         .target(name: "SpearGameCore"),
-        .executableTarget(name: "TTALGAK", dependencies: ["SpearGameCore"], resources: [.copy("Resources/StickmanMotion")]),
+        .executableTarget(name: "TTALGAK", dependencies: ["SpearGameCore"], exclude: ["Resources", "StickmanMotionAssets.swift"]),
         .testTarget(name: "SpearGameCoreTests", dependencies: ["SpearGameCore"], path: "Tests", exclude: ["verify_project.py"])
     ]
 )

@@ -10,8 +10,12 @@ overlay = (root / "Sources/TTALGAK/OverlayController.swift").read_text()
 view = (root / "Sources/TTALGAK/SpearThrowView.swift").read_text()
 tests = (root / "Tests/SpearGameStateTests.swift").read_text()
 all_source = "\n".join(path.read_text() for path in (root / "Sources").rglob("*.swift"))
+v3_runtime_source = "\n".join(path.read_text() for path in (root / "Sources/TTALGAK").glob("*.swift") if path.name != "StickmanMotionAssets.swift")
 
 assert 'exclude: ["verify_project.py"]' in package
+assert 'exclude: ["Resources", "StickmanMotionAssets.swift"]' in package and 'resources:' not in package
+assert 'StickmanMotionAssets' not in v3_runtime_source and 'MotionAssetBand' not in v3_runtime_source and 'MotionAssetSnapshot' not in v3_runtime_source
+assert 'XCTAssertNil(gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false))' in tests
 assert 'width: 180, height: 110' in overlay and overlay.count('GamePanel(frame: .zero, interaction:') == 2
 assert 'groundY = Double(bottomY + 16)' in overlay and 'seedY = [64.0, 132.0, 200.0]' in overlay
 assert 'DisplayPanel(frame: screen.frame)' in overlay and 'SceneView' in overlay and 'FlightView' in overlay

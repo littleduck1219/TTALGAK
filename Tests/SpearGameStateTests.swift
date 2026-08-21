@@ -46,7 +46,7 @@ final class SpearGameStateTests: XCTestCase {
     func testGestureCancelsOutsideAndStaleDownResets() {
         var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false)
+        XCTAssertNil(gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false))
         XCTAssertNil(gesture.release(isInsideInput: false))
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
     }
