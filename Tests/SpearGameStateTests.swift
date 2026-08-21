@@ -1,6 +1,14 @@
 import XCTest
 @testable import SpearGameCore
 
+private let bounds1600 = ScreenBounds(minX: 0, maxX: 1600, minY: 0, maxY: 900)
+private let screenStart400x300 = PresentationPoint(x: 400, y: 300)
+// 45-degree reverse ray from (400,300) exits the bottom boundary first: 300 / sin(45) = 300 * sqrt(2).
+private let maxPull45 = 300 * sqrt(2.0)
+private func beginCentered(_ gesture: inout LocalGesture) -> Bool {
+    gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true, screenStart: screenStart400x300, screenBounds: bounds1600)
+}
+
 final class SpearGameStateTests: XCTestCase {
     func testDragMapsExactAngleAndReverseTangentPower() {
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -48), 10, accuracy: 0.0001)
@@ -10,14 +18,92 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 24), 55, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -96), 10, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 96), 65, accuracy: 0.0001)
-        let angle = 45.0
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -6 / sqrt(2), y: -6 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -163 / sqrt(2), y: -163 / sqrt(2)), angleDegrees: angle), 0.5, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -320 / sqrt(2), y: -320 / sqrt(2)), angleDegrees: angle), 1, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -72 / sqrt(2), y: -72 / sqrt(2)), angleDegrees: angle), (72.0 - 6) / 314, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -160 / sqrt(2), y: -160 / sqrt(2)), angleDegrees: angle), (160.0 - 6) / 314, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -240 / sqrt(2), y: -240 / sqrt(2)), angleDegrees: angle), (240.0 - 6) / 314, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: 320 / sqrt(2), y: 320 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
+        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        XCTAssertEqual(DragLaunch.reversePull(displacement: PresentationPoint(x: -6 / sqrt(2), y: -6 / sqrt(2)), tangent: tangent), 6, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.reversePull(displacement: PresentationPoint(x: -100 / sqrt(2), y: -100 / sqrt(2)), tangent: tangent), 100, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.reversePull(displacement: PresentationPoint(x: 100 / sqrt(2), y: 100 / sqrt(2)), tangent: tangent), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 6, maxPull: 400), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 7, maxPull: 400), 1.0 / 394, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 203, maxPull: 400), 0.5, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 400, maxPull: 400), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 999, maxPull: 400), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 100, maxPull: 6), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 100, maxPull: 0), 0, accuracy: 0.0001)
+    }
+
+    func testReverseRayHitsFirstScreenBoundary() {
+        let t45 = DragLaunch.tangent(angleDegrees: 45)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: screenStart400x300, reverse: t45 * -1, bounds: bounds1600), maxPull45, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: PresentationPoint(x: 200, y: 500), reverse: t45 * -1, bounds: bounds1600), 200 * sqrt(2.0), accuracy: 1e-9)
+        let t10 = DragLaunch.tangent(angleDegrees: 10)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: screenStart400x300, reverse: t10 * -1, bounds: bounds1600), 400 / t10.x, accuracy: 1e-9)
+        let t65 = DragLaunch.tangent(angleDegrees: 65)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: screenStart400x300, reverse: t65 * -1, bounds: bounds1600), 300 / t65.y, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: screenStart400x300, reverse: t45, bounds: bounds1600), 600 * sqrt(2.0), accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: PresentationPoint(x: 0, y: 300), reverse: t45 * -1, bounds: bounds1600), 0, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: PresentationPoint(x: 0, y: 0), reverse: t45 * -1, bounds: bounds1600), 0, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.maxPull(fromScreenStart: PresentationPoint(x: -10, y: -10), reverse: t45 * -1, bounds: bounds1600), 0, accuracy: 1e-9)
+    }
+
+    func testScreenEdgePowerAndTensionReachExactMaxAtBoundary() {
+        XCTAssertEqual(DragLaunch.power(rawPull: maxPull45, maxPull: maxPull45), 1, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: maxPull45, maxPull: maxPull45), 160, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 0, maxPull: 400), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 6, maxPull: 400), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 7, maxPull: 400), 2.8, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 200, maxPull: 400), 80, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 400, maxPull: 400), 160, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 500, maxPull: 400), 160, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 100, maxPull: 0), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 100, maxPull: 4), 0, accuracy: 0.0001)
+        let clamped = FrozenLaunch(angleDegrees: 45, power: 0.5, rawPull: -5, maxPull: -9, start: PresentationPoint(x: 0, y: 0))
+        XCTAssertEqual(clamped.rawPull, 0, accuracy: 0.0001)
+        XCTAssertEqual(clamped.maxPull, 0, accuracy: 0.0001)
+    }
+
+    func testBoundedCorridorTilesFollowFrozenRayToFirstBoundary() {
+        let reverse = DragLaunch.tangent(angleDegrees: 45) * -1
+        let corridor = PullCorridor(start: screenStart400x300, reverse: reverse, maxPull: maxPull45, bounds: bounds1600)
+        XCTAssertEqual(PullCorridor.tileSide, 32, accuracy: 0.0001)
+        XCTAssertEqual(PullCorridor.documentedWidth, 46, accuracy: 0.0001)
+        XCTAssertEqual(corridor.end.x, 100, accuracy: 1e-9)
+        XCTAssertEqual(corridor.end.y, 0, accuracy: 1e-9)
+        XCTAssertFalse(corridor.tiles.isEmpty)
+        XCTAssertTrue(corridor.tiles.allSatisfy { $0.width <= PullCorridor.tileSide && $0.height <= PullCorridor.tileSide })
+        XCTAssertTrue(corridor.tiles.allSatisfy { $0.minX >= bounds1600.minX && $0.maxX <= bounds1600.maxX && $0.minY >= bounds1600.minY && $0.maxY <= bounds1600.maxY })
+        XCTAssertTrue(corridor.tiles.contains { $0.contains(corridor.end) })
+        XCTAssertFalse(corridor.tiles.contains { $0.contains(PresentationPoint(x: 1000, y: 700)) })
+    }
+
+    func testCorridorOpensOnlyAtLatchAndScreenMovesPreserveFrozenGeometry() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(beginCentered(&gesture))
+        XCTAssertNil(gesture.corridor)
+        XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 46, y: 48), isInsideInput: true))
+        XCTAssertNil(gesture.corridor)
+        let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
+        let corridor = gesture.corridor
+        XCTAssertNotNil(corridor)
+        XCTAssertEqual(corridor?.maxPull, latched?.maxPull)
+        let edge = corridor?.end ?? screenStart400x300
+        let full = gesture.move(toScreenPoint: edge, start: PresentationPoint(x: 10, y: 20))
+        XCTAssertEqual(full?.maxPull, latched?.maxPull)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
+        XCTAssertEqual(full?.rawPull, full?.maxPull)
+        XCTAssertEqual(gesture.corridor, corridor)
+        XCTAssertNotNil(gesture.release(isInsideInput: false))
+        XCTAssertNil(gesture.corridor)
+    }
+
+    func testGestureCancellationReleasesCorridorAndLaunch() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(beginCentered(&gesture))
+        XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
+        XCTAssertNotNil(gesture.corridor)
+        gesture.cancel()
+        XCTAssertNil(gesture.corridor)
+        XCTAssertNil(gesture.launch)
+        XCTAssertNil(gesture.release(isInsideInput: false))
     }
 
     func testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest() {
@@ -128,7 +214,7 @@ final class SpearGameStateTests: XCTestCase {
 
     func testGestureKeepsOutsideDragAndReleasesOnce() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         let outside = gesture.move(to: PresentationPoint(x: -100, y: 0), isInsideInput: false)
         XCTAssertNotNil(outside)
         XCTAssertEqual(outside?.angleDegrees ?? 0, 10, accuracy: 0.0001)
@@ -137,107 +223,136 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertNil(gesture.release(isInsideInput: false))
     }
 
-    func testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput() {
+    func testMaxPowerAtScreenEdgeOutsideLocalInput() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        let tangent = DragLaunch.tangent(angleDegrees: 10)
-        let almost = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 319, y: 48 - tangent.y * 319), isInsideInput: false)
+        XCTAssertTrue(beginCentered(&gesture))
+        let t10 = DragLaunch.tangent(angleDegrees: 10)
+        let edgePull = 400 / t10.x
+        let almost = gesture.move(to: PresentationPoint(x: 48 - 399, y: 0), isInsideInput: false)
+        XCTAssertEqual(almost?.angleDegrees ?? 0, 10, accuracy: 0.0001)
+        XCTAssertEqual(almost?.maxPull ?? 0, edgePull, accuracy: 1e-9)
         XCTAssertLessThan(almost?.power ?? 1, 1)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 320, y: 48 - tangent.y * 320), isInsideInput: false)
-        XCTAssertEqual(full?.angleDegrees ?? 0, 10, accuracy: 0.0001)
-        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
+        let full = gesture.move(to: PresentationPoint(x: 48 - 400, y: 0), isInsideInput: false)
+        XCTAssertEqual(full?.rawPull ?? 0, edgePull, accuracy: 1e-9)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0, maxPull: full?.maxPull ?? 0), 160, accuracy: 1e-9)
         XCTAssertEqual(gesture.release(isInsideInput: false), full)
     }
 
     func testAngleOnlyVerticalMoveKeepsLatchedPowerExactlyWhileAngleChanges() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
         XCTAssertEqual(latched?.angleDegrees ?? 0, 45, accuracy: 0.0001)
         XCTAssertGreaterThan(latched?.power ?? 0, 0)
+        XCTAssertEqual(latched?.maxPull ?? 0, maxPull45, accuracy: 1e-9)
         let raised = gesture.move(to: PresentationPoint(x: 28, y: 72), isInsideInput: true)
         XCTAssertEqual(raised?.angleDegrees ?? 0, 55, accuracy: 0.0001)
         XCTAssertEqual(raised?.power, latched?.power)
+        XCTAssertEqual(raised?.maxPull, latched?.maxPull)
         let lowered = gesture.move(to: PresentationPoint(x: 28, y: 24), isInsideInput: true)
         XCTAssertEqual(lowered?.angleDegrees ?? 0, 27.5, accuracy: 0.0001)
         XCTAssertEqual(lowered?.power, latched?.power)
+        XCTAssertEqual(lowered?.maxPull, latched?.maxPull)
         XCTAssertEqual(gesture.release(isInsideInput: true), lowered)
     }
 
     func testFurtherPullAlongFrozenReverseTangentRaisesLatchedPower() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         let tangent = DragLaunch.tangent(angleDegrees: 45)
         let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
         XCTAssertGreaterThan(latched?.power ?? 0, 0)
         let pulled = gesture.move(to: PresentationPoint(x: 28 - tangent.x * 40, y: 48 - tangent.y * 40), isInsideInput: true)
-        XCTAssertEqual(pulled?.power ?? 0, (latched?.power ?? 0) + 40.0 / 314, accuracy: 0.0001)
+        XCTAssertEqual(pulled?.power ?? 0, (latched?.power ?? 0) + 40 / (maxPull45 - 6), accuracy: 0.0001)
         XCTAssertGreaterThan(pulled?.power ?? 0, latched?.power ?? 1)
     }
 
-    func testFrozenAxisFullPullReachesExactMaxAtThreeTwenty() {
+    func testFrozenAxisFullPullReachesExactMaxAtScreenEdge() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        XCTAssertTrue(beginCentered(&gesture))
         let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
         XCTAssertGreaterThan(latched?.power ?? 0, 0)
-        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: true)
-        XCTAssertEqual(halfway?.power ?? 0, (160.0 - 6) / 314, accuracy: 0.0001)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 320, y: 48 - tangent.y * 320), isInsideInput: true)
-        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
-        XCTAssertEqual(full?.angleDegrees ?? 0, 10, accuracy: 0.0001)
+        let halfway = gesture.move(to: PresentationPoint(x: 48 - 150, y: 48), isInsideInput: true)
+        XCTAssertEqual(halfway?.rawPull ?? 0, 150 * sqrt(2.0), accuracy: 1e-9)
+        XCTAssertEqual(halfway?.power ?? 0, (150 * sqrt(2.0) - 6) / (maxPull45 - 6), accuracy: 0.0001)
+        let full = gesture.move(to: PresentationPoint(x: 48 - 300, y: 48), isInsideInput: true)
+        XCTAssertEqual(full?.rawPull ?? 0, maxPull45, accuracy: 1e-9)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
+        XCTAssertEqual(full?.angleDegrees ?? 0, 45, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0, maxPull: full?.maxPull ?? 0), 160, accuracy: 1e-9)
         XCTAssertEqual(gesture.release(isInsideInput: true), full)
     }
 
-    func testRawPullMapsProportionallyToVisibleTension() {
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 0), 0, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 6), 0, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 7), 3.5, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 160), 80, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 320), 160, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 400), 160, accuracy: 0.0001)
-        XCTAssertEqual(FrozenLaunch(angleDegrees: 45, power: 0.5, rawPull: -5, start: PresentationPoint(x: 0, y: 0)).rawPull, 0, accuracy: 0.0001)
-    }
-
-    func testVerticalAngleOnlyMovePreservesRawPullAndVisibleTension() {
+    func testVerticalAngleOnlyMovePreservesRawPullMaxPullPowerAndTension() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
-        let pulled = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48), isInsideInput: true)
-        XCTAssertEqual(pulled?.rawPull ?? 0, 160, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: pulled?.rawPull ?? 0), 80, accuracy: 0.0001)
-        XCTAssertEqual(pulled?.power ?? 0, (160.0 - 6) / 314, accuracy: 0.0001)
-        let raised = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 72), isInsideInput: true)
+        let pulled = gesture.move(to: PresentationPoint(x: 48 - 150, y: 48), isInsideInput: true)
+        XCTAssertEqual(pulled?.rawPull ?? 0, 150 * sqrt(2.0), accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: pulled?.rawPull ?? 0, maxPull: pulled?.maxPull ?? 0), 80, accuracy: 1e-9)
+        let raised = gesture.move(to: PresentationPoint(x: 48 - 150, y: 72), isInsideInput: true)
         XCTAssertEqual(raised?.angleDegrees ?? 0, 55, accuracy: 0.0001)
         XCTAssertEqual(raised?.rawPull, pulled?.rawPull)
+        XCTAssertEqual(raised?.maxPull, pulled?.maxPull)
         XCTAssertEqual(raised?.power, pulled?.power)
-        let lowered = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 24), isInsideInput: true)
+        let lowered = gesture.move(to: PresentationPoint(x: 48 - 150, y: 24), isInsideInput: true)
         XCTAssertEqual(lowered?.angleDegrees ?? 0, 27.5, accuracy: 0.0001)
         XCTAssertEqual(lowered?.rawPull, pulled?.rawPull)
+        XCTAssertEqual(lowered?.maxPull, pulled?.maxPull)
         XCTAssertEqual(lowered?.power, pulled?.power)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: lowered?.rawPull ?? 0), 80, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: lowered?.rawPull ?? 0, maxPull: lowered?.maxPull ?? 0), 80, accuracy: 1e-9)
     }
 
     func testFurtherFrozenAxisPullGrowsRawPullVisibleTensionAndPower() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        let tangent = DragLaunch.tangent(angleDegrees: 45)
+        XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
-        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: true)
-        XCTAssertEqual(halfway?.rawPull ?? 0, 160, accuracy: 0.0001)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 320, y: 48 - tangent.y * 320), isInsideInput: true)
-        XCTAssertEqual(full?.rawPull ?? 0, 320, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 160, accuracy: 0.0001)
-        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
+        let halfway = gesture.move(to: PresentationPoint(x: 48 - 150, y: 48), isInsideInput: true)
+        XCTAssertEqual(halfway?.rawPull ?? 0, 150 * sqrt(2.0), accuracy: 1e-9)
+        let full = gesture.move(to: PresentationPoint(x: 48 - 300, y: 48), isInsideInput: true)
+        XCTAssertEqual(full?.rawPull ?? 0, maxPull45, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0, maxPull: full?.maxPull ?? 0), 160, accuracy: 1e-9)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
         XCTAssertGreaterThan(full?.rawPull ?? 0, halfway?.rawPull ?? 1)
         XCTAssertEqual(gesture.release(isInsideInput: true), full)
         XCTAssertNil(gesture.release(isInsideInput: true))
     }
 
+    func testExplicitScreenStartGeometrySeamControlsMaxPull() {
+        var near = LocalGesture()
+        var far = LocalGesture()
+        XCTAssertTrue(near.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true, screenStart: PresentationPoint(x: 400, y: 150), screenBounds: bounds1600))
+        XCTAssertTrue(beginCentered(&far))
+        XCTAssertNotNil(near.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
+        XCTAssertNotNil(far.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
+        let nearFull = near.move(to: PresentationPoint(x: 48 - 150, y: 48), isInsideInput: true)
+        let farSame = far.move(to: PresentationPoint(x: 48 - 150, y: 48), isInsideInput: true)
+        XCTAssertEqual(nearFull?.maxPull ?? 0, 150 * sqrt(2.0), accuracy: 1e-9)
+        XCTAssertEqual(farSame?.maxPull ?? 0, 300 * sqrt(2.0), accuracy: 1e-9)
+        XCTAssertEqual(nearFull?.power ?? 0, 1, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: nearFull?.rawPull ?? 0, maxPull: nearFull?.maxPull ?? 0), 160, accuracy: 1e-9)
+        XCTAssertLessThan(farSame?.power ?? 1, 1)
+    }
+
+    func testFailClosedScreenGeometryYieldsZeroPower() {
+        var corner = LocalGesture()
+        XCTAssertTrue(corner.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true, screenStart: PresentationPoint(x: 0, y: 0), screenBounds: bounds1600))
+        let cornered = corner.move(to: PresentationPoint(x: 48 - 300, y: 48), isInsideInput: true)
+        XCTAssertEqual(cornered?.maxPull ?? -1, 0, accuracy: 1e-9)
+        XCTAssertEqual(cornered?.power ?? 1, 0, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: cornered?.rawPull ?? 0, maxPull: cornered?.maxPull ?? 0), 0, accuracy: 1e-9)
+        var tiny = LocalGesture()
+        XCTAssertTrue(tiny.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true, screenStart: PresentationPoint(x: 3, y: 3), screenBounds: ScreenBounds(minX: 0, maxX: 8, minY: 0, maxY: 8)))
+        let squeezed = tiny.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
+        XCTAssertLessThanOrEqual(squeezed?.maxPull ?? 7, 6)
+        XCTAssertEqual(squeezed?.power ?? 1, 0, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: squeezed?.rawPull ?? 0, maxPull: squeezed?.maxPull ?? 0), 0, accuracy: 1e-9)
+    }
+
     func testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         let up = gesture.move(to: PresentationPoint(x: 48, y: 96), isInsideInput: true)
         XCTAssertEqual(up?.angleDegrees ?? 0, 65, accuracy: 0.0001)
         XCTAssertEqual(up?.power ?? 1, 0, accuracy: 0.0001)
@@ -247,9 +362,9 @@ final class SpearGameStateTests: XCTestCase {
 
     func testGestureNextValidDownDiscardsStaleLaunch() {
         var gesture = LocalGesture()
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNotNil(gesture.move(to: PresentationPoint(x: -100, y: 0), isInsideInput: false))
-        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNil(gesture.release(isInsideInput: false))
     }
 

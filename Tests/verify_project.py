@@ -25,12 +25,24 @@ assert 'leftInset = 96.0' in overlay and 'x: frame.minX + leftInset' in overlay
 assert 'PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)' in overlay
 assert 'groundY = Double(bottomY + 16)' in overlay
 
-# 320pt reverse pull: dead zone 6pt, power = clamp((r-6)/314, 0, 1); the old 160pt (denominator 154) and 72pt (66) maxima must fail.
-assert '(reverse - 6) / 314' in core
-assert '(reverse - 6) / 154' not in core and '(reverse - 6) / 66' not in core
-assert '320 / sqrt(2)' in tests and '(72.0 - 6) / 314' in tests
-assert '(160.0 - 6) / 314' in tests and '(240.0 - 6) / 314' in tests
-assert 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput' in tests
+# Dynamic screen-edge max pull: any fixed full-pull threshold (320pt, denominators 314/154/66) is
+# forbidden in core. maxPull is the slab-exit ray distance from the screen-converted press point along
+# the frozen reverse tangent to the FIRST primary-screen boundary; power = clamp((r-6)/(maxPull-6),0,1)
+# with a fail-closed maxPull > 6 validation (never remapped to any fixed constant).
+assert '320' not in core and '/ 314' not in core and '/ 154' not in core and '/ 66' not in core
+assert 'struct ScreenBounds' in core
+assert 'deadZone = 6.0' in core
+assert 'func maxPull(fromScreenStart start: PresentationPoint, reverse: PresentationPoint, bounds: ScreenBounds)' in core
+assert 'reverse.x < 0 ? bounds.minX : bounds.maxX' in core
+assert 'reverse.y < 0 ? bounds.minY : bounds.maxY' in core
+assert 'guard let first = exits.min(), first > 0 else { return 0 }' in core
+assert '(rawPull - deadZone) / (maxPull - deadZone)' in core
+assert core.count('guard maxPull > deadZone, rawPull > deadZone else { return 0 }') == 2
+assert 'testReverseRayHitsFirstScreenBoundary' in tests
+assert 'testScreenEdgePowerAndTensionReachExactMaxAtBoundary' in tests
+assert 'testMaxPowerAtScreenEdgeOutsideLocalInput' in tests
+assert 'testFailClosedScreenGeometryYieldsZeroPower' in tests
+assert '300 * sqrt(2.0)' in tests and '400 / t10.x' in tests
 
 # Asymmetric angle range 10...65 around center 45: dy=-48 -> 10 (slope 35/48 down), dy=+48 -> 65 (slope 20/48 up).
 # The old symmetric mapping and any 25-degree minimum clamp must fail.
@@ -45,36 +57,70 @@ assert '[10.0, 45.0, 65.0]' in tests and '[25.0, 45.0, 65.0]' not in tests
 assert 'testLaunchAndFlightClampAnglesToTenSixtyFive' in tests
 assert 'tangent(angleDegrees: 25)' not in tests
 
-# Power latch: first 6pt dead-zone crossing freezes the tangent; afterwards power is measured only along
-# that frozen axis (-dx / tangent.x). Per-current-angle re-projection of power on every move must fail.
+# Power latch: first 6pt dead-zone crossing freezes the tangent AND the screen-edge maxPull together;
+# afterwards power is measured only along that frozen axis (-dx / tangent.x) against the frozen maxPull.
+# Per-current-angle re-projection or per-move maxPull recomputation must fail.
 assert 'latchedTangent' in core
 assert 'latchedTangent.map { max(0, -displacement.x / $0.x) }' in core
-assert 'DragLaunch.power(reverse: rawPull)' in core
-assert 'latchedTangent = DragLaunch.tangent(angleDegrees: angle)' in core
+assert 'DragLaunch.power(rawPull: rawPull, maxPull: frozenMaxPull)' in core
+assert 'latchedTangent = tangent' in core
+assert 'frozenMaxPull = DragLaunch.maxPull(fromScreenStart: screenStart, reverse: tangent * -1, bounds: screenBounds)' in core
+assert core.count('frozenMaxPull = DragLaunch.maxPull(') == 1
 assert 'latchedTangent = nil' in core
-assert 'power: DragLaunch.power(displacement: displacement, angleDegrees: angle)' not in core
+assert 'DragLaunch.power(reverse:' not in core and 'power(displacement:' not in core
 assert 'testAngleOnlyVerticalMoveKeepsLatchedPowerExactlyWhileAngleChanges' in tests
 assert 'testFurtherPullAlongFrozenReverseTangentRaisesLatchedPower' in tests
-assert 'testFrozenAxisFullPullReachesExactMaxAtThreeTwenty' in tests
+assert 'testFrozenAxisFullPullReachesExactMaxAtScreenEdge' in tests
 assert 'testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower' in tests
 assert 'XCTAssertEqual(raised?.power, latched?.power)' in tests
 assert 'XCTAssertEqual(lowered?.power, latched?.power)' in tests
 
-# Visible pull: the latched raw pull-axis distance is retained on FrozenLaunch and rendered proportionally
-# (tension = clamp(rawPull/320*160, 0, 160), hidden inside the 6pt dead zone). The old 6+24*power (30pt max)
-# tension mapping must fail, and the hand/launch P0 must stay fixed so flight starts with no discontinuity.
-assert 'public let rawPull: Double' in core
-assert 'self.rawPull = max(rawPull, 0)' in core
-assert 'rawPull <= 6 ? 0 : min(max(rawPull / 320 * 160, 0), 160)' in core
-assert 'rawPull: rawPull' in core
-assert 'DragLaunch.tensionLength(rawPull: launch.rawPull)' in view
+# Visible pull: FrozenLaunch retains both the raw frozen-axis pull and the frozen screen-edge maxPull,
+# and the renderer maps tension = clamp(rawPull/maxPull*160, 0, 160), hidden inside the 6pt dead zone,
+# so exactly the first display boundary shows the full 160pt line. Fixed-320 tension mapping must fail.
+assert 'public let rawPull: Double' in core and 'public let maxPull: Double' in core
+assert 'self.rawPull = max(rawPull, 0)' in core and 'self.maxPull = max(maxPull, 0)' in core
+assert 'rawPull / maxPull * 160' in core
+assert 'rawPull: rawPull, maxPull: frozenMaxPull' in core
+assert 'DragLaunch.tensionLength(rawPull: launch.rawPull, maxPull: launch.maxPull)' in view
 assert '6 + 24 * launch.power' not in view
 assert 'guard launch.power > 0' not in view
 assert 'drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming)' in view
-assert 'testRawPullMapsProportionallyToVisibleTension' in tests
-assert 'testVerticalAngleOnlyMovePreservesRawPullAndVisibleTension' in tests
+assert 'testVerticalAngleOnlyMovePreservesRawPullMaxPullPowerAndTension' in tests
 assert 'testFurtherFrozenAxisPullGrowsRawPullVisibleTensionAndPower' in tests
-assert 'tensionLength(rawPull: 160), 80' in tests and 'tensionLength(rawPull: 320), 160' in tests
+assert 'tensionLength(rawPull: 200, maxPull: 400), 80' in tests
+assert 'tensionLength(rawPull: 400, maxPull: 400), 160' in tests
+
+# Screen-start geometry seam: the local mouseDown point converts only through the local
+# NSView -> NSWindow -> convertToScreen chain, screen bounds come from NSScreen.main.frame at gesture
+# begin, and both are injected into the pure core (no global pointer/location query anywhere).
+assert 'case down(PresentationPoint, screen: PresentationPoint)' in view
+assert 'convert(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y)), to: nil)' in view
+assert 'window.convertToScreen' in view
+assert 'screenStart: PresentationPoint, screenBounds: ScreenBounds' in core
+assert 'ScreenBounds(minX: Double(frame.minX), maxX: Double(frame.maxX), minY: Double(frame.minY), maxY: Double(frame.maxY))' in overlay
+assert 'screenStart: screenPoint, screenBounds: bounds' in overlay
+assert 'mouseLocation' not in all_source
+assert 'testExplicitScreenStartGeometrySeamControlsMaxPull' in tests
+
+# Accepted recovery is a temporary union of documented 32pt bounded tiles along only the frozen ray,
+# never a fullscreen input window. It opens after latch and is torn down on every terminal lifecycle.
+assert 'struct PullCorridor' in core and 'static let tileSide = 32.0' in core and 'static let documentedWidth = 46.0' in core
+assert 'public private(set) var corridor: PullCorridor?' in core
+assert 'corridor = PullCorridor(start: screenStart, reverse: tangent * -1, maxPull: frozenMaxPull, bounds: screenBounds)' in core
+assert 'func move(toScreenPoint point: PresentationPoint' in core
+assert 'final class GestureCorridor' in overlay and 'final class CorridorPanel' in overlay
+assert 'geometry.tiles.map' in overlay and 'only overlapping 32pt tiles' in overlay
+assert 'openCorridor(' in overlay and 'closeCorridor()' in overlay
+assert overlay.count('closeCorridor()') >= 7
+assert overlay.count('game.launch()') == 1 and 'guard game.phase == .aiming else { return }' in overlay
+assert 'DisplayPanel(frame: screen.frame)' in overlay
+assert 'CorridorPanel(frame: screen.frame)' not in overlay
+assert 'GestureCorridor(frame: screen.frame)' not in overlay
+assert 'NSScreen.main?.frame' not in view
+assert 'testBoundedCorridorTilesFollowFrozenRayToFirstBoundary' in tests
+assert 'testCorridorOpensOnlyAtLatchAndScreenMovesPreserveFrozenGeometry' in tests
+assert 'testGestureCancellationReleasesCorridorAndLaunch' in tests
 
 # In-memory ground-miss FIFO (50, oldest evicted); hits never retained; renderer draws stored spears, no ground line.
 assert 'GroundSpearInventory' in core and 'capacity = 50' in core and 'guard !hit else { return }' in core
@@ -115,11 +161,11 @@ assert re.search(r'func move\(to point: PresentationPoint, isInsideInput _: Bool
 assert re.search(r'func release\(isInsideInput _: Bool\)', core)
 assert not re.search(r'guard\s+let down[^\n]*\bisInsideInput\b', core)
 assert not re.search(r'return\s+isInsideInput\b', core)
-for expected in ('gravity = 2400.0', 'shaftLength = 42.0', 'v0 = 900 + 1000 * self.power', 'cos(radians)', 'sin(radians)', 'reverse <= 6', '(reverse - 6) / 314', 'ceil((end.tip - start.tip).length / 4)', 'radius = 16.0', 'firstGroundCrossing', 'LocalGesture'):
+for expected in ('gravity = 2400.0', 'shaftLength = 42.0', 'v0 = 900 + 1000 * self.power', 'cos(radians)', 'sin(radians)', 'deadZone = 6.0', 'ceil((end.tip - start.tip).length / 4)', 'radius = 16.0', 'firstGroundCrossing', 'LocalGesture'):
     assert expected in core
-for forbidden in ('targetX', 'canonicalHeight', 'canonicalAim', 'launchCoefficient', 'coefficient(for:', 'normalizedLanding', 'PresentationFlightPath', 'CGEventTap', 'CGEventPost', 'CGEventSource', 'CGWarpMouseCursorPosition', 'CGAssociateMouseAndMouseCursorPosition', 'NSEvent.mouseLocation', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'ScreenCaptureKit', 'AXUIElement', 'AXIsProcessTrusted', 'URLSession', 'NSPasteboard', 'UserDefaults', 'FileManager', 'NSKeyedArchiver'):
+for forbidden in ('targetX', 'canonicalHeight', 'canonicalAim', 'launchCoefficient', 'coefficient(for:', 'normalizedLanding', 'PresentationFlightPath', 'CGEventTap', 'CGEventPost', 'CGEventSource', 'CGWarpMouseCursorPosition', 'CGAssociateMouseAndMouseCursorPosition', 'NSEvent.mouseLocation', 'mouseLocationOutsideOfEventStream', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'ScreenCaptureKit', 'AXUIElement', 'AXIsProcessTrusted', 'URLSession', 'NSPasteboard', 'UserDefaults', 'FileManager', 'NSKeyedArchiver', 'CGWindowList', 'NSWindowSharing'):
     assert forbidden not in all_source
-for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
+for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testMaxPowerAtScreenEdgeOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
     assert expected in tests
 assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
-print('PASS: TTALGAK v3 local drag (320pt pull, asymmetric angle 10...65), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
+print('PASS: TTALGAK v3 local drag (dynamic screen-edge max pull, asymmetric angle 10...65), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')

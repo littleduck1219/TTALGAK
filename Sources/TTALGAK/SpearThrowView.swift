@@ -4,14 +4,21 @@ import SpearGameCore
 private let ink = NSColor.black
 
 final class SpearThrowView: NSView {
-    enum Event { case down(PresentationPoint), move(PresentationPoint, Bool), up(Bool) }
+    enum Event { case down(PresentationPoint, screen: PresentationPoint), move(PresentationPoint, Bool), up(Bool) }
     private let onEvent: (Event) -> Void
     init(frame: NSRect, onEvent: @escaping (Event) -> Void) { self.onEvent = onEvent; super.init(frame: frame); wantsLayer = true }
     required init?(coder: NSCoder) { nil }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     private func point(_ event: NSEvent) -> PresentationPoint { let p = convert(event.locationInWindow, from: nil); return PresentationPoint(x: Double(p.x), y: Double(p.y)) }
     private var actorStartZone: NSRect { NSRect(x: 44, y: 36, width: 44, height: 44) }
-    override func mouseDown(with event: NSEvent) { let p = point(event); guard actorStartZone.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return }; onEvent(.down(p)) }
+    // The screen-space press point comes only from the local NSView -> NSWindow -> convertToScreen chain.
+    override func mouseDown(with event: NSEvent) {
+        let p = point(event)
+        guard actorStartZone.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))), let window else { return }
+        let windowPoint = convert(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y)), to: nil)
+        let screenPoint = window.convertToScreen(NSRect(origin: windowPoint, size: .zero)).origin
+        onEvent(.down(p, screen: PresentationPoint(x: Double(screenPoint.x), y: Double(screenPoint.y))))
+    }
     override func mouseDragged(with event: NSEvent) { let p = point(event); onEvent(.move(p, bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
     override func mouseUp(with event: NSEvent) { let p = point(event); onEvent(.up(bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
 }
@@ -51,7 +58,7 @@ final class SceneView: NSView {
         let end = NSPoint(x: hand.x + CGFloat(t.x * 42), y: hand.y + CGFloat(t.y * 42))
         let arm = NSBezierPath(); arm.move(to: NSPoint(x: hand.x - 8, y: hand.y + 2)); arm.line(to: hand); arm.lineWidth = 3; arm.stroke()
         let spear = NSBezierPath(); spear.move(to: hand); spear.line(to: end); spear.lineWidth = 3; spear.lineCapStyle = .round; spear.stroke()
-        let length = DragLaunch.tensionLength(rawPull: launch.rawPull)
+        let length = DragLaunch.tensionLength(rawPull: launch.rawPull, maxPull: launch.maxPull)
         guard length > 0 else { return }
         let tension = NSBezierPath(); tension.move(to: hand); tension.line(to: NSPoint(x: hand.x - CGFloat(t.x * length), y: hand.y - CGFloat(t.y * length))); tension.lineWidth = 2; tension.lineCapStyle = .round; tension.stroke()
     }

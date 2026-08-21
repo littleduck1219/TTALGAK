@@ -6,6 +6,7 @@ final class OverlayController {
     private let leftInset = 96.0
     private var panels: [GamePanel] = []
     private var scenePanel: DisplayPanel?
+    private var gestureCorridor: GestureCorridor?
     private var game = SpearGameState()
     private var gesture = LocalGesture()
     private var currentLaunch: FrozenLaunch?
@@ -23,6 +24,7 @@ final class OverlayController {
     var isVisible: Bool { !panels.isEmpty }
     func toggle() { isVisible ? hide() : show() }
     func show() {
+        closeCorridor()
         guard panels.isEmpty else { reposition(); return }
         let left = GamePanel(frame: .zero, interaction: .input)
         let right = GamePanel(frame: .zero, interaction: .displayOnly)
@@ -33,7 +35,7 @@ final class OverlayController {
         panels.forEach { $0.orderFrontRegardless() }
         showScene()
     }
-    func hide() { stopTimers(); scenePanel?.orderOut(nil); scenePanel = nil; panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
+    func hide() { closeCorridor(); gesture.cancel(); game.reset(); currentLaunch = nil; path = nil; stopTimers(); scenePanel?.orderOut(nil); scenePanel = nil; panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
 
     func reposition() {
         guard panels.count == 2, let screen = NSScreen.main else { return }
@@ -75,24 +77,63 @@ final class OverlayController {
         guard let left = panels.first else { return }
         let start = PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)
         switch event {
-        case .down(let point):
-            guard game.phase == .ready, gesture.begin(at: point, inStartZone: true) else { return }
+        case .down(let point, let screenPoint):
+            guard game.phase == .ready, let screen = NSScreen.main else { return }
+            let frame = screen.frame
+            let bounds = ScreenBounds(minX: Double(frame.minX), maxX: Double(frame.maxX), minY: Double(frame.minY), maxY: Double(frame.maxY))
+            guard gesture.begin(at: point, inStartZone: true, screenStart: screenPoint, screenBounds: bounds) else { return }
             game.beginAim()
             currentLaunch = FrozenLaunch(angleDegrees: 45, power: 0, start: start)
             reducedMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         case .move(let point, let inside):
             guard game.phase == .aiming else { return }
             currentLaunch = gesture.move(to: point, isInsideInput: inside, start: start)
-            if currentLaunch == nil { game.reset() }
+            if let corridor = gesture.corridor { openCorridor(corridor) }
+            if currentLaunch == nil { closeCorridor(); gesture.cancel(); game.reset() }
         case .up(let inside):
+            closeCorridor()
             guard game.phase == .aiming else { return }
             guard let launch = gesture.release(isInsideInput: inside), launch.power > 0 else { game.reset(); currentLaunch = nil; refreshScene(); return }
-            currentLaunch = launch
-            game.launch()
-            path = BallisticFlightPath(start: launch.start, angleDegrees: launch.angleDegrees, power: launch.power, groundY: groundY)
-            if reducedMotion { resolveReduced() } else { startFlight() }
+            finishGesture(with: launch)
         }
         refreshScene()
+    }
+
+    private func openCorridor(_ geometry: PullCorridor) {
+        guard gestureCorridor == nil, !geometry.tiles.isEmpty else { return }
+        gestureCorridor = GestureCorridor(geometry: geometry) { [weak self] event in self?.handleCorridor(event) }
+    }
+
+    private func closeCorridor() {
+        gestureCorridor?.close()
+        gestureCorridor = nil
+    }
+
+    private func handleCorridor(_ event: CorridorView.Event) {
+        guard game.phase == .aiming, let left = panels.first else { closeCorridor(); return }
+        let start = PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)
+        switch event {
+        case .move(let screenPoint):
+            currentLaunch = gesture.move(toScreenPoint: screenPoint, start: start)
+            if currentLaunch == nil { closeCorridor(); gesture.cancel(); game.reset() }
+        case .up(let screenPoint):
+            currentLaunch = gesture.move(toScreenPoint: screenPoint, start: start)
+            closeCorridor()
+            guard let launch = gesture.release(isInsideInput: false), launch.power > 0 else { game.reset(); currentLaunch = nil; refreshScene(); return }
+            finishGesture(with: launch)
+        case .cancel:
+            closeCorridor(); gesture.cancel(); game.reset(); currentLaunch = nil
+        }
+        refreshScene()
+    }
+
+    private func finishGesture(with launch: FrozenLaunch) {
+        guard game.phase == .aiming else { return }
+        closeCorridor()
+        currentLaunch = launch
+        game.launch()
+        path = BallisticFlightPath(start: launch.start, angleDegrees: launch.angleDegrees, power: launch.power, groundY: groundY)
+        if reducedMotion { resolveReduced() } else { startFlight() }
     }
 
     private func resolveReduced() {
@@ -124,6 +165,7 @@ final class OverlayController {
     }
 
     private func resolve(hit: Bool, point: PresentationPoint) {
+        closeCorridor()
         guard game.phase == .flying else { return }
         flightTimer?.invalidate(); flightTimer = nil
         (scenePanel?.contentView as? SceneView)?.flightPath = nil
@@ -133,6 +175,7 @@ final class OverlayController {
         resetTimer?.invalidate()
         resetTimer = Timer.scheduledTimer(withTimeInterval: reducedMotion ? 0.5 : 0.36, repeats: false) { [weak self] _ in
             guard let self else { return }
+            self.closeCorridor(); self.gesture.cancel()
             self.game.reset(); self.currentLaunch = nil; self.path = nil
             if hit { self.spawnTarget() }
             self.refreshScene()
@@ -140,6 +183,49 @@ final class OverlayController {
     }
 
     private func stopTimers() { [flightTimer, resetTimer].forEach { $0?.invalidate() }; flightTimer = nil; resetTimer = nil }
+}
+
+/// Owns only overlapping 32pt tiles along the frozen pull ray. There is deliberately no fullscreen
+/// input panel: coordinates outside this union have no TTALGAK input window and remain pass-through.
+private final class GestureCorridor {
+    private var panels: [CorridorPanel] = []
+    init(geometry: PullCorridor, onEvent: @escaping (CorridorView.Event) -> Void) {
+        panels = geometry.tiles.map { tile in
+            let frame = NSRect(x: tile.minX, y: tile.minY, width: tile.width, height: tile.height)
+            let panel = CorridorPanel(frame: frame)
+            panel.contentView = CorridorView(frame: NSRect(origin: .zero, size: frame.size), onEvent: onEvent)
+            panel.orderFrontRegardless()
+            return panel
+        }
+    }
+    func close() { panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
+    deinit { close() }
+}
+
+private final class CorridorPanel: NSPanel {
+    init(frame: NSRect) {
+        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isOpaque = false; backgroundColor = .clear; hasShadow = false; level = .floating
+        collectionBehavior = [.canJoinAllSpaces, .stationary]; ignoresMouseEvents = false
+    }
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+private final class CorridorView: NSView {
+    enum Event { case move(PresentationPoint), up(PresentationPoint), cancel }
+    private let onEvent: (Event) -> Void
+    init(frame: NSRect, onEvent: @escaping (Event) -> Void) { self.onEvent = onEvent; super.init(frame: frame) }
+    required init?(coder: NSCoder) { nil }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    private func screenPoint(_ event: NSEvent) -> PresentationPoint? {
+        guard let window else { return nil }
+        let point = window.convertToScreen(NSRect(origin: event.locationInWindow, size: .zero)).origin
+        return PresentationPoint(x: Double(point.x), y: Double(point.y))
+    }
+    override func mouseDragged(with event: NSEvent) { if let point = screenPoint(event) { onEvent(.move(point)) } }
+    override func mouseUp(with event: NSEvent) { if let point = screenPoint(event) { onEvent(.up(point)) } else { onEvent(.cancel) } }
+    override func cancelOperation(_ sender: Any?) { onEvent(.cancel) }
 }
 
 private final class GamePanel: NSPanel {
