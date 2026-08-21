@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Linux-safe v3 static guardrail; macOS/AppKit runtime remains Mac QA only."""
 from pathlib import Path
+import math
 import re
 
 root = Path(__file__).resolve().parents[1]
@@ -17,8 +18,14 @@ assert 'exclude: ["Resources", "StickmanMotionAssets.swift"]' in package and 're
 assert 'StickmanMotionAssets' not in v3_runtime_source and 'MotionAssetBand' not in v3_runtime_source and 'MotionAssetSnapshot' not in v3_runtime_source
 assert 'XCTAssertNil(gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false))' in tests
 assert 'width: 180, height: 110' in overlay and overlay.count('GamePanel(frame: .zero, interaction:') == 2
+assert 'leftInset = 96.0' in overlay and 'x: frame.minX + leftInset' in overlay
+assert 96.0 >= 72.0
+assert 66 - 72 / math.sqrt(2) >= 0 and 58 - 72 / math.sqrt(2) >= 0
+assert 'PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)' in overlay
 assert 'groundY = Double(bottomY + 16)' in overlay and 'seedY = [64.0, 132.0, 200.0]' in overlay
 assert 'DisplayPanel(frame: screen.frame)' in overlay and 'SceneView' in overlay and 'FlightView' in overlay
+assert 'actorStartZone: NSRect { NSRect(x: 44, y: 36, width: 44, height: 44) }' in view
+assert 'let ground = NSBezierPath()' not in view and 'ground.stroke()' not in view
 assert 'ignoresMouseEvents = FlightLayerContract.visibilityOnly.ignoresMouseEvents' in overlay
 assert 'canBecomeKey: Bool { false }' in overlay and 'canBecomeMain: Bool { false }' in overlay
 assert 'mouseDown' in view and 'mouseDragged' in view and 'mouseUp' in view

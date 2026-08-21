@@ -1,6 +1,6 @@
 # TTALGAK 창던지기 v3
 
-Native macOS 13+ menu-bar mini game. `I_L` is the only pointer input: a transparent `180 × 110 pt` nonactivating panel. Pointer down must begin in its visible actor/held-spear `44 × 44 pt` local zone. `I_R` remains a transparent `180 × 110 pt` display-only structural panel. The actor, target, ground, result, and flight render on a separate full-primary-display transparent display panel; it ignores mouse events and is never key/main.
+Native macOS 13+ menu-bar mini game. `I_L` is the only pointer input: a transparent `180 × 110 pt` nonactivating panel, placed `96pt` inward from the physical left edge. Pointer down must begin in its visible actor/held-spear `44 × 44 pt` local zone, centered on the launch hand at local `(66,58)` so a 45° reverse `72pt` pull remains local. `I_R` remains a transparent `180 × 110 pt` display-only structural panel. The actor, target, result, and flight render on a separate full-primary-display transparent display panel; it ignores mouse events and is never key/main. The physical `groundY` plane is intentionally invisible: it is used only for first-crossing miss resolution, never as a rendered ground line.
 
 ## v3 contract
 

@@ -10,7 +10,7 @@ final class SpearThrowView: NSView {
     required init?(coder: NSCoder) { nil }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     private func point(_ event: NSEvent) -> PresentationPoint { let p = convert(event.locationInWindow, from: nil); return PresentationPoint(x: Double(p.x), y: Double(p.y)) }
-    private var actorStartZone: NSRect { NSRect(x: 26, y: 24, width: 44, height: 44) }
+    private var actorStartZone: NSRect { NSRect(x: 44, y: 36, width: 44, height: 44) }
     override func mouseDown(with event: NSEvent) { let p = point(event); guard actorStartZone.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return }; onEvent(.down(p)) }
     override func mouseDragged(with event: NSEvent) { let p = point(event); onEvent(.move(p, bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
     override func mouseUp(with event: NSEvent) { let p = point(event); onEvent(.up(bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
@@ -19,15 +19,14 @@ final class SpearThrowView: NSView {
 final class SceneView: NSView {
     var inputFrame = NSRect.zero { didSet { needsDisplay = true } }
     var target = PresentationPoint(x: 0, y: 0) { didSet { needsDisplay = true } }
-    var groundY: CGFloat = 0 { didSet { needsDisplay = true } }
+
     var aiming: FrozenLaunch? { didSet { needsDisplay = true } }
     var result: (hit: Bool, point: PresentationPoint)? { didSet { needsDisplay = true } }
     var screenOrigin = PresentationPoint(x: 0, y: 0)
     private func local(_ p: PresentationPoint) -> NSPoint { NSPoint(x: CGFloat(p.x - screenOrigin.x), y: CGFloat(p.y - screenOrigin.y)) }
     override func draw(_ dirtyRect: NSRect) {
         ink.setStroke()
-        let localGround = groundY - CGFloat(screenOrigin.y)
-        let ground = NSBezierPath(); ground.move(to: NSPoint(x: 0, y: localGround)); ground.line(to: NSPoint(x: bounds.width, y: localGround)); ground.lineWidth = 1.5; ground.stroke()
+        let localGround = inputFrame.minY + 16 - CGFloat(screenOrigin.y)
         let feet = NSPoint(x: inputFrame.minX + 48 - CGFloat(screenOrigin.x), y: localGround)
         drawActor(feet: feet)
         let center = local(target); for radius: CGFloat in [22, 10] { let ring = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)); ring.lineWidth = 3.5; ring.stroke() }

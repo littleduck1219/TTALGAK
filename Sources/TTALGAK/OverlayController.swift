@@ -3,6 +3,7 @@ import SpearGameCore
 
 final class OverlayController {
     private let boxSize = NSSize(width: 180, height: 110)
+    private let leftInset = 96.0
     private var panels: [GamePanel] = []
     private var scenePanel: DisplayPanel?
     private var flightPanel: DisplayPanel?
@@ -37,7 +38,7 @@ final class OverlayController {
         guard panels.count == 2, let screen = NSScreen.main else { return }
         let frame = screen.frame
         let bottomY = frame.minY + min(max(frame.height * 0.08, 72), 120)
-        panels[0].setFrame(NSRect(x: frame.minX, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
+        panels[0].setFrame(NSRect(x: frame.minX + leftInset, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
         panels[1].setFrame(NSRect(x: frame.maxX - boxSize.width, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
         groundY = Double(bottomY + 16)
         let seedY = [64.0, 132.0, 200.0][round % 3]
@@ -61,7 +62,6 @@ final class OverlayController {
     private func refreshScene(result: (Bool, PresentationPoint)? = nil) {
         guard let scene = scenePanel?.contentView as? SceneView else { return }
         scene.inputFrame = panels.first?.frame ?? .zero
-        scene.groundY = CGFloat(groundY)
         scene.target = target
         scene.aiming = game.phase == .aiming ? currentLaunch : nil
         if let result { scene.result = (hit: result.0, point: result.1) }
