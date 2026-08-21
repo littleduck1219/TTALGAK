@@ -43,12 +43,23 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertNil(SpearCollision.firstImpact(path: path, target: PresentationPoint(x: 260, y: 700), fromElapsed: 0, toElapsed: path.groundCrossing.elapsed))
     }
 
-    func testGestureCancelsOutsideAndStaleDownResets() {
+    func testGestureKeepsOutsideDragAndReleasesOnce() {
         var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
-        XCTAssertNil(gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false))
+        let outside = gesture.move(to: PresentationPoint(x: -100, y: 0), isInsideInput: false)
+        XCTAssertNotNil(outside)
+        XCTAssertEqual(outside?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertGreaterThan(outside?.power ?? 0, 0)
+        XCTAssertEqual(gesture.release(isInsideInput: false), outside)
         XCTAssertNil(gesture.release(isInsideInput: false))
+    }
+
+    func testGestureNextValidDownDiscardsStaleLaunch() {
+        var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertNotNil(gesture.move(to: PresentationPoint(x: -100, y: 0), isInsideInput: false))
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        XCTAssertNil(gesture.release(isInsideInput: false))
     }
 
     func testFlightClockAndDisplayContractsRemainLocalAndNonactivating() {

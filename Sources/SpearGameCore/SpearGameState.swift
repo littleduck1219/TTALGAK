@@ -57,29 +57,27 @@ public struct FrozenLaunch: Equatable {
     }
 }
 
-/// Local-only gesture state. The caller supplies local containment; it never queries global pointer state.
+/// Local-only gesture state. After a valid local start-zone down, local drag/up containment is deliberately ignored until that NSView receives mouseUp; it never queries global pointer state.
 public struct LocalGesture: Equatable {
     private var down: PresentationPoint?
-    private var cancelled = false
     public private(set) var launch: FrozenLaunch?
     public init() {}
     public mutating func begin(at point: PresentationPoint, inStartZone: Bool) -> Bool {
         down = inStartZone ? point : nil
-        cancelled = !inStartZone
         launch = nil
         return inStartZone
     }
-    public mutating func move(to point: PresentationPoint, isInsideInput: Bool, start: PresentationPoint = PresentationPoint(x: 0, y: 0)) -> FrozenLaunch? {
-        guard let down, isInsideInput, !cancelled else { cancelled = true; return nil }
+    public mutating func move(to point: PresentationPoint, isInsideInput _: Bool, start: PresentationPoint = PresentationPoint(x: 0, y: 0)) -> FrozenLaunch? {
+        guard let down else { return nil }
         let displacement = point - down
         let angle = DragLaunch.angle(forVerticalDrag: displacement.y)
         let value = FrozenLaunch(angleDegrees: angle, power: DragLaunch.power(displacement: displacement, angleDegrees: angle), start: start)
         launch = value
         return value
     }
-    public mutating func release(isInsideInput: Bool) -> FrozenLaunch? {
-        defer { down = nil; launch = nil; cancelled = false }
-        return isInsideInput && !cancelled ? launch : nil
+    public mutating func release(isInsideInput _: Bool) -> FrozenLaunch? {
+        defer { down = nil; launch = nil }
+        return launch
     }
 }
 

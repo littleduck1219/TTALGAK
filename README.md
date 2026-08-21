@@ -5,7 +5,7 @@ Native macOS 13+ menu-bar mini game. `I_L` is the only pointer input: a transpar
 ## v3 contract
 
 - Local vertical drag maps exactly to `angle=clamp(45 + 20×dy/48, 25, 65)` in y-up points. Reverse tangent projection maps power with a 6pt dead zone and 72pt maximum: `r=max(0,-dot(D,t))`, `power=clamp((r-6)/66,0,1)`.
-- Down/move/up are local NSView events only. Leaving `I_L` cancels; the next local down resets stale aim. There are no event monitors, taps, global pointer/key/cursor APIs, capture, network, clipboard, or permission APIs.
+- Down/move/up are local NSView events only. A down must begin in the actor zone; after that valid down, the same NSView's `mouseDragged` coordinates update tension outside `I_L` and its actual `mouseUp` launches the final frozen value once, regardless of containment. The next valid down discards stale aim. There are no event monitors, taps, global pointer/key/cursor APIs, capture, network, clipboard, or permission APIs.
 - Pure launch input is frozen `(P0, angle, power, groundY)`. `g=2400 pt/s²`, `v0=900+1000×power`, `L=42`; target seed/result never participate in velocity or trajectory calculation.
 - Hit is only physical `R=16` shaft-segment/ring collision. Miss is the first physical ground-plane crossing, or an honest off-display miss. No target steering, canonical target calibration, endpoint blend, prediction arc, numeric gauge, card, or angle label exists.
 - Standard mode uses common-run-loop monotonic elapsed time and ≤4pt collision substeps. Reduced Motion evaluates the same frozen physics immediately, shows a static truthful result, and creates no flight trajectory layer.
