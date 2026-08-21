@@ -40,7 +40,7 @@ public enum DragLaunch {
     }
     public static func power(reverse: Double) -> Double {
         if reverse <= 6 { return 0 }
-        return min((reverse - 6) / 154, 1)
+        return min((reverse - 6) / 314, 1)
     }
     public static func power(displacement: PresentationPoint, angleDegrees: Double) -> Double {
         let tangent = tangent(angleDegrees: angleDegrees)

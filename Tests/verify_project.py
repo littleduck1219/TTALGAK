@@ -25,11 +25,12 @@ assert 'leftInset = 96.0' in overlay and 'x: frame.minX + leftInset' in overlay
 assert 'PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)' in overlay
 assert 'groundY = Double(bottomY + 16)' in overlay
 
-# 160pt reverse pull: dead zone 6pt, power = clamp((r-6)/154, 0, 1); the old 72pt maximum (denominator 66) must fail.
-assert '(reverse - 6) / 154' in core
-assert '(reverse - 6) / 66' not in core
-assert '160 / sqrt(2)' in tests and '(72.0 - 6) / 154' in tests
-assert 'testMaxPowerNeedsFullOneSixtyPullOutsideLocalInput' in tests
+# 320pt reverse pull: dead zone 6pt, power = clamp((r-6)/314, 0, 1); the old 160pt (denominator 154) and 72pt (66) maxima must fail.
+assert '(reverse - 6) / 314' in core
+assert '(reverse - 6) / 154' not in core and '(reverse - 6) / 66' not in core
+assert '320 / sqrt(2)' in tests and '(72.0 - 6) / 314' in tests
+assert '(160.0 - 6) / 314' in tests and '(240.0 - 6) / 314' in tests
+assert 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput' in tests
 
 # Power latch: first 6pt dead-zone crossing freezes the tangent; afterwards power is measured only along
 # that frozen axis (-dx / tangent.x). Per-current-angle re-projection of power on every move must fail.
@@ -40,7 +41,7 @@ assert 'latchedTangent = nil' in core
 assert 'power: DragLaunch.power(displacement: displacement, angleDegrees: angle)' not in core
 assert 'testAngleOnlyVerticalMoveKeepsLatchedPowerExactlyWhileAngleChanges' in tests
 assert 'testFurtherPullAlongFrozenReverseTangentRaisesLatchedPower' in tests
-assert 'testFrozenAxisFullPullReachesExactMaxAtOneSixty' in tests
+assert 'testFrozenAxisFullPullReachesExactMaxAtThreeTwenty' in tests
 assert 'testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower' in tests
 assert 'XCTAssertEqual(raised?.power, latched?.power)' in tests
 assert 'XCTAssertEqual(lowered?.power, latched?.power)' in tests
@@ -84,11 +85,11 @@ assert re.search(r'func move\(to point: PresentationPoint, isInsideInput _: Bool
 assert re.search(r'func release\(isInsideInput _: Bool\)', core)
 assert not re.search(r'guard\s+let down[^\n]*\bisInsideInput\b', core)
 assert not re.search(r'return\s+isInsideInput\b', core)
-for expected in ('gravity = 2400.0', 'shaftLength = 42.0', 'v0 = 900 + 1000 * self.power', 'cos(radians)', 'sin(radians)', 'reverse <= 6', '(reverse - 6) / 154', 'ceil((end.tip - start.tip).length / 4)', 'radius = 16.0', 'firstGroundCrossing', 'LocalGesture'):
+for expected in ('gravity = 2400.0', 'shaftLength = 42.0', 'v0 = 900 + 1000 * self.power', 'cos(radians)', 'sin(radians)', 'reverse <= 6', '(reverse - 6) / 314', 'ceil((end.tip - start.tip).length / 4)', 'radius = 16.0', 'firstGroundCrossing', 'LocalGesture'):
     assert expected in core
 for forbidden in ('targetX', 'canonicalHeight', 'canonicalAim', 'launchCoefficient', 'coefficient(for:', 'normalizedLanding', 'PresentationFlightPath', 'CGEventTap', 'CGEventPost', 'CGEventSource', 'CGWarpMouseCursorPosition', 'CGAssociateMouseAndMouseCursorPosition', 'NSEvent.mouseLocation', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'ScreenCaptureKit', 'AXUIElement', 'AXIsProcessTrusted', 'URLSession', 'NSPasteboard', 'UserDefaults', 'FileManager', 'NSKeyedArchiver'):
     assert forbidden not in all_source
-for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testMaxPowerNeedsFullOneSixtyPullOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
+for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testMaxPowerNeedsFullThreeTwentyPullOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
     assert expected in tests
 assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
-print('PASS: TTALGAK v3 local drag (160pt pull), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
+print('PASS: TTALGAK v3 local drag (320pt pull), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
