@@ -24,6 +24,24 @@ public struct PresentationPoint: Equatable {
     public var normalized: Self { let length = length; return length > 0 ? self * (1 / length) : Self(x: 1, y: 0) }
 }
 
+/// Monotonic flight timing. A timer is only a wake-up; it never supplies elapsed time.
+public struct FlightClock: Equatable {
+    public let maximumDelta: Double
+    private var lastTick: Double?
+    public init(maximumDelta: Double = 0.25) { self.maximumDelta = maximumDelta }
+    public mutating func advance(now: Double) -> Double {
+        guard let lastTick else { self.lastTick = now; return 0 }
+        guard now >= lastTick else { return 0 }
+        self.lastTick = now
+        return min(now - lastTick, maximumDelta)
+    }
+}
+
+/// Flight paths are screen-space; FlightPanel content is local space.
+public enum FlightPanelCoordinates {
+    public static func local(_ screenPoint: PresentationPoint, screenOrigin: PresentationPoint) -> PresentationPoint { screenPoint - screenOrigin }
+}
+
 /// Discrete source bands. Raw aiming is only a selector; runtime never interpolates asset poses.
 public enum MotionAssetBand: CaseIterable, Equatable {
     case low25, mid45, high65

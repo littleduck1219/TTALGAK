@@ -30,7 +30,7 @@ swift build
 swift run TTALGAK
 ```
 
-Record PASS/FAIL and observations for asset loading/fallback, low/mid/high discrete band and release frames, final P0/tangent launch continuity, ballistic apex/descent/actual collision, recovery→Ready timing, underlying button/text/drag pass-through and focus, right/flight non-key behavior, black/no-box/180×110 bounds, Reduced Motion, and no Screen Recording/Accessibility/Input Monitoring prompt. Linux static validation below is not macOS/AppKit runtime proof.
+Record PASS/FAIL and observations for asset loading/fallback, low/mid/high discrete band and release frames, final P0/tangent launch continuity, ballistic apex/descent/actual collision, recovery→Ready timing, underlying button/text/drag pass-through and focus, right/flight non-key behavior, black/no-box/180×110 bounds, Reduced Motion, and no Screen Recording/Accessibility/Input Monitoring prompt. For the mandatory mid-band throw, once code-flight starts the spear must visibly advance, impact, or miss within 1 second; it must never remain fixed with no target cue. Linux static validation below is not macOS/AppKit runtime proof.
 
 ```bash
 python3 Tools/regenerate_motion_pngs.py

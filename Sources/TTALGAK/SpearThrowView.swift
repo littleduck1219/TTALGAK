@@ -105,6 +105,7 @@ final class TargetView: NSView {
 final class FlightView: NSView {
     var path: BallisticFlightPath? { didSet { needsDisplay = true } }
     var elapsed = 0.0 { didSet { needsDisplay = true } }
-    override func draw(_ dirtyRect: NSRect) { guard let path else { return }; let sample = path.sample(elapsed: elapsed); drawSpear(tail: NSPoint(x: CGFloat(sample.tail.x), y: CGFloat(sample.tail.y)), tip: NSPoint(x: CGFloat(sample.tip.x), y: CGFloat(sample.tip.y))) }
+    var screenOrigin = PresentationPoint(x: 0, y: 0)
+    override func draw(_ dirtyRect: NSRect) { guard let path else { return }; let sample = path.sample(elapsed: elapsed); let tail = FlightPanelCoordinates.local(sample.tail, screenOrigin: screenOrigin); let tip = FlightPanelCoordinates.local(sample.tip, screenOrigin: screenOrigin); drawSpear(tail: NSPoint(x: CGFloat(tail.x), y: CGFloat(tail.y)), tip: NSPoint(x: CGFloat(tip.x), y: CGFloat(tip.y))) }
     private func drawSpear(tail: NSPoint, tip: NSPoint) { ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke(); let head = NSBezierPath(); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 6, y: tip.y - 3)); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 5, y: tip.y + 4)); head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke() }
 }

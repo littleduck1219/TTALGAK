@@ -44,8 +44,12 @@ assert 'path.sample(elapsed: elapsed)' in view and 'var targetPoint' in view and
 assert 'NSColor.black' in view and 'let origin = NSPoint(x: 48, y: 33)' in view
 assert 'lineWidth = 3' in view and 'lineWidth = 3.5' in view
 assert 'showsFlightTranslation: false' in core and 'staticResultDuration: 0.5' in core
-for expected in ('testCanonicalTargetSetupMatchesBallisticTailAtImpact', 'testBallisticLaunchApexAndDescentUseVelocityOnly', 'testCollisionSamplesShaftWithFourPointMaximumSubsteps', 'testCollisionIsTheOnlyOutcomeAuthority', 'testReleaseHandMovesContinuouslyWithoutBodyCrossAndFlightStartsAtFinalHand', 'testDiscreteBandFreezesAssetTangentAndFinalP0ForBallistics', 'testReleaseSequenceUsesDiscreteAssetFramesAtExactOffsets', 'testFallbackSnapshotStaysCodeDrawnAndNeverBlank'):
+for expected in ('testCanonicalTargetSetupMatchesBallisticTailAtImpact', 'testBallisticLaunchApexAndDescentUseVelocityOnly', 'testCollisionSamplesShaftWithFourPointMaximumSubsteps', 'testCollisionIsTheOnlyOutcomeAuthority', 'testReleaseHandMovesContinuouslyWithoutBodyCrossAndFlightStartsAtFinalHand', 'testDiscreteBandFreezesAssetTangentAndFinalP0ForBallistics', 'testReleaseSequenceUsesDiscreteAssetFramesAtExactOffsets', 'testFlightClockUsesFirstTickAsBaselineThenMonotonicActualDeltaWithClamp', 'testFlightPanelCoordinatesConvertGlobalScreenPointToContentLocal', 'testFallbackSnapshotStaysCodeDrawnAndNeverBlank'):
     assert expected in tests
+assert 'struct FlightClock' in core and 'maximumDelta' in core and 'enum FlightPanelCoordinates' in core
+assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
+assert 'Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0' not in overlay and 'let step = 1.0 / 60.0' not in overlay
+assert 'FlightPanelCoordinates.local(sample.tail, screenOrigin: screenOrigin)' in view
 for expected in ('enum MotionAssetBand', 'struct MotionAssetSnapshot', 'forRawAim', 'releaseFrameOffsetsMs', 'init(start: PresentationPoint, targetX: Double, snapshot: MotionAssetSnapshot)', 'CAKeyframeAnimation(keyPath: "contents")', 'entry → 053 → 107 → 160', 'StickmanMotionAssets', 'usesAssetFrame', 'BallisticFlightPath(start: snapshot.flightStart, targetX: targetCenter.x, snapshot: snapshot)', 'hideFlight()'):
     assert expected in all_source
 assert 'SpearPresentationGeometry(pose: .release, aimDegrees: left.aimDegrees)' not in overlay

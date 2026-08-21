@@ -102,6 +102,19 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 160), 3)
     }
 
+    func testFlightClockUsesFirstTickAsBaselineThenMonotonicActualDeltaWithClamp() {
+        var clock = FlightClock(maximumDelta: 0.25)
+        XCTAssertEqual(clock.advance(now: 10), 0)
+        XCTAssertEqual(clock.advance(now: 10.08), 0.08, accuracy: 0.000_001)
+        XCTAssertEqual(clock.advance(now: 11), 0.25, accuracy: 0.000_001)
+        XCTAssertEqual(clock.advance(now: 10.9), 0, accuracy: 0.000_001)
+    }
+
+    func testFlightPanelCoordinatesConvertGlobalScreenPointToContentLocal() {
+        let origin = PresentationPoint(x: -1440, y: 24)
+        XCTAssertEqual(FlightPanelCoordinates.local(PresentationPoint(x: -1300, y: 100), screenOrigin: origin), PresentationPoint(x: 140, y: 76))
+    }
+
     func testFallbackSnapshotStaysCodeDrawnAndNeverBlank() {
         let snapshot = MotionAssetSnapshot.fallback(for: .high65)
         XCTAssertTrue(snapshot.usesCodeFallback)

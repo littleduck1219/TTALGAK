@@ -15,6 +15,7 @@ final class OverlayController {
     private var presentationPolicy = PresentationPolicy.standard
     private var releaseElapsed = 0.0
     private var flightElapsed = 0.0
+    private var flightClock = FlightClock()
     private var flightPath: BallisticFlightPath?
     private var frozenAssetSnapshot: MotionAssetSnapshot?
     private var targetCenter = PresentationPoint(x: 0, y: 0)
@@ -82,22 +83,35 @@ final class OverlayController {
             self.render()
         }
     }
-    private func startFlight() { flightElapsed = 0; flightTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() } }
+    private func startFlight() {
+        flightTimer?.invalidate()
+        flightElapsed = 0
+        flightClock = FlightClock()
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() }
+        flightTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
     private func advanceFlight() {
-        let step = 1.0 / 60.0
         guard lifecycle.phase == .flying, let path = flightPath else { return }
-        let previous = flightElapsed; flightElapsed = min(flightElapsed + step, BallisticFlightPath.visualDuration)
+        let delta = flightClock.advance(now: ProcessInfo.processInfo.systemUptime)
+        guard delta > 0 else { return }
+        let previous = flightElapsed; flightElapsed = min(flightElapsed + delta, BallisticFlightPath.visualDuration)
         if let impact = SpearCollision.firstImpact(path: path, target: targetCenter, fromElapsed: previous, toElapsed: flightElapsed) { flightElapsed = impact; (flightPanel?.contentView as? FlightView)?.elapsed = impact; resolveFlight(hit: true); return }
         (flightPanel?.contentView as? FlightView)?.elapsed = flightElapsed
-        lifecycle.advance(by: step)
+        lifecycle.advance(by: delta)
         if flightElapsed >= BallisticFlightPath.visualDuration { resolveFlight(hit: false) }
         render()
     }
     private func showFlightPanel() {
         guard let screen = NSScreen.main, let path = flightPath else { return }
-        let panel = FlightPanel(frame: screen.frame, contract: .visibilityOnly); let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size)); flight.path = path; flight.elapsed = 0; panel.contentView = flight; flightPanel = panel; panel.orderFrontRegardless()
+        hideFlight()
+        let panel = FlightPanel(frame: screen.frame, contract: .visibilityOnly); let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size)); flight.path = path; flight.elapsed = 0; panel.contentView = flight
+        let contentOrigin = flight.convertToScreen(NSRect(origin: .zero, size: .zero)).origin
+        flight.screenOrigin = PresentationPoint(x: contentOrigin.x, y: contentOrigin.y)
+        flightPanel = panel; panel.orderFrontRegardless()
     }
     private func resolveFlight(hit: Bool) {
+        guard game.phase == .flying else { return }
         flightTimer?.invalidate(); flightTimer = nil
         // Accepted M-01/M-02 contract: remove the visibility-only flight layer at impact; TargetView owns the result cue.
         hideFlight()
