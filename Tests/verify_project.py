@@ -106,6 +106,20 @@ assert 'testExplicitScreenStartGeometrySeamControlsMaxPull' in tests
 # Accepted recovery is a temporary union of documented 32pt bounded tiles along only the frozen ray,
 # never a fullscreen input window. It opens after latch and is torn down on every terminal lifecycle.
 assert 'struct PullCorridor' in core and 'static let tileSide = 32.0' in core and 'static let documentedWidth = 46.0' in core
+pull_corridor = core[core.index('public struct PullCorridor'):core.index('public enum DragLaunch')]
+tile_initializer = re.search(r'temporaryTiles = \(0\.\.\.count\)\.compactMap \{ index in(?P<body>.*?)\n            \}', pull_corridor, re.S)
+assert tile_initializer and 'self' not in tile_initializer.group('body')
+for expected in (
+    'let normalizedMaxPull = max(maxPull, 0)',
+    'let endPoint = start + direction * normalizedMaxPull',
+    'let count = max(1, Int(ceil(normalizedMaxPull / Self.step)))',
+    'let temporaryTiles: [CorridorTile]',
+    'let distance = min(Double(index) * Self.step, normalizedMaxPull)',
+    'self.end = endPoint',
+    'self.maxPull = normalizedMaxPull',
+    'self.tiles = temporaryTiles',
+):
+    assert expected in pull_corridor
 assert 'public private(set) var corridor: PullCorridor?' in core
 assert 'corridor = PullCorridor(start: screenStart, reverse: tangent * -1, maxPull: frozenMaxPull, bounds: screenBounds)' in core
 assert 'func move(toScreenPoint point: PresentationPoint' in core

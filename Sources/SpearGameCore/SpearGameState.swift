@@ -70,22 +70,29 @@ public struct PullCorridor: Equatable {
 
     public init(start: PresentationPoint, reverse: PresentationPoint, maxPull: Double, bounds: ScreenBounds) {
         let direction = reverse.normalized
-        self.start = start
-        self.reverse = direction
-        self.maxPull = max(maxPull, 0)
-        end = start + direction * self.maxPull
-        guard self.maxPull > DragLaunch.deadZone else { tiles = []; return }
-        let count = max(1, Int(ceil(self.maxPull / Self.step)))
-        tiles = (0...count).compactMap { index in
-            let distance = min(Double(index) * Self.step, self.maxPull)
-            let center = start + direction * distance
-            let minX = max(center.x - Self.tileSide / 2, bounds.minX)
-            let maxX = min(center.x + Self.tileSide / 2, bounds.maxX)
-            let minY = max(center.y - Self.tileSide / 2, bounds.minY)
-            let maxY = min(center.y + Self.tileSide / 2, bounds.maxY)
-            guard maxX > minX, maxY > minY else { return nil }
-            return CorridorTile(minX: minX, minY: minY, width: maxX - minX, height: maxY - minY)
+        let normalizedMaxPull = max(maxPull, 0)
+        let endPoint = start + direction * normalizedMaxPull
+        let count = max(1, Int(ceil(normalizedMaxPull / Self.step)))
+        let temporaryTiles: [CorridorTile]
+        if normalizedMaxPull > DragLaunch.deadZone {
+            temporaryTiles = (0...count).compactMap { index in
+                let distance = min(Double(index) * Self.step, normalizedMaxPull)
+                let center = start + direction * distance
+                let minX = max(center.x - Self.tileSide / 2, bounds.minX)
+                let maxX = min(center.x + Self.tileSide / 2, bounds.maxX)
+                let minY = max(center.y - Self.tileSide / 2, bounds.minY)
+                let maxY = min(center.y + Self.tileSide / 2, bounds.maxY)
+                guard maxX > minX, maxY > minY else { return nil }
+                return CorridorTile(minX: minX, minY: minY, width: maxX - minX, height: maxY - minY)
+            }
+        } else {
+            temporaryTiles = []
         }
+        self.start = start
+        self.end = endPoint
+        self.reverse = direction
+        self.maxPull = normalizedMaxPull
+        self.tiles = temporaryTiles
     }
 }
 
