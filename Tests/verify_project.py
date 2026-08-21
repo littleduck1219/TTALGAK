@@ -2,6 +2,7 @@
 """Linux-safe static guardrail; macOS/AppKit runtime remains Mac QA only."""
 from pathlib import Path
 import json
+import re
 
 root = Path(__file__).resolve().parents[1]
 resources = root / "Sources" / "TTALGAK" / "Resources" / "StickmanMotion"
@@ -21,6 +22,7 @@ for band, degree in (("low25", 25), ("mid45", 45), ("high65", 65)):
     assert degree in (25, 45, 65)
 
 package = (root / "Package.swift").read_text()
+assets = (root / "Sources/TTALGAK/StickmanMotionAssets.swift").read_text()
 overlay = (root / "Sources/TTALGAK/OverlayController.swift").read_text()
 view = (root / "Sources/TTALGAK/SpearThrowView.swift").read_text()
 core = (root / "Sources/SpearGameCore/SpearGameState.swift").read_text()
@@ -50,6 +52,14 @@ assert 'struct FlightClock' in core and 'maximumDelta' in core and 'enum FlightP
 assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
 assert 'Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0' not in overlay and 'let step = 1.0 / 60.0' not in overlay
 assert 'FlightPanelCoordinates.local(sample.tail, screenOrigin: screenOrigin)' in view
+# AppKit regression guard: NSView has no convertToScreen; local view space must flow through its NSWindow.
+for source in (assets, overlay, view):
+    assert not re.search(r'(?<!\.)\bconvertToScreen\(', source), "unqualified convertToScreen is invalid"
+    assert not re.search(r'\b(?:view|flight|self)\.convertToScreen\(', source), "NSView convertToScreen is invalid"
+assert 'window.convertToScreen(' in assets and 'window.convertToScreen(' in view
+assert 'panel.convertToScreen(' in overlay
+assert not re.search(r'guard\s+let[^\n]*compactMap', view), "compactMap returns an array, not an optional"
+assert 'let images: [NSImage] = selectedBand.releaseFiles.compactMap' in view
 for expected in ('enum MotionAssetBand', 'struct MotionAssetSnapshot', 'forRawAim', 'releaseFrameOffsetsMs', 'init(start: PresentationPoint, targetX: Double, snapshot: MotionAssetSnapshot)', 'CAKeyframeAnimation(keyPath: "contents")', 'entry → 053 → 107 → 160', 'StickmanMotionAssets', 'usesAssetFrame', 'BallisticFlightPath(start: snapshot.flightStart, targetX: targetCenter.x, snapshot: snapshot)', 'hideFlight()'):
     assert expected in all_source
 assert 'SpearPresentationGeometry(pose: .release, aimDegrees: left.aimDegrees)' not in overlay

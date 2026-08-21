@@ -106,7 +106,8 @@ final class OverlayController {
         guard let screen = NSScreen.main, let path = flightPath else { return }
         hideFlight()
         let panel = FlightPanel(frame: screen.frame, contract: .visibilityOnly); let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size)); flight.path = path; flight.elapsed = 0; panel.contentView = flight
-        let contentOrigin = flight.convertToScreen(NSRect(origin: .zero, size: .zero)).origin
+        // Panel content origin `(0, 0)` is converted by its owning NSWindow into screen space.
+        let contentOrigin = panel.convertToScreen(NSRect(origin: .zero, size: .zero)).origin
         flight.screenOrigin = PresentationPoint(x: contentOrigin.x, y: contentOrigin.y)
         flightPanel = panel; panel.orderFrontRegardless()
     }

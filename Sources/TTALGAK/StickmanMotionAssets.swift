@@ -35,7 +35,10 @@ final class StickmanMotionAssets {
         let contact = sequence(for: band).contact.final
         guard contact.hand.count == 2, contact.tail == contact.hand, contact.ballisticP0 == contact.hand, contact.tangent.count == 2 else { return nil }
         let local = NSPoint(x: contact.ballisticP0![0], y: 110 - contact.ballisticP0![1])
-        let screen = view.convertToScreen(NSRect(origin: local, size: .zero)).origin
+        // `local` is view space; convert through the owning window before requesting screen space.
+        guard let window = view.window else { return nil }
+        let windowPoint = view.convert(NSRect(origin: local, size: .zero), to: nil).origin
+        let screen = window.convertToScreen(NSRect(origin: windowPoint, size: .zero)).origin
         return MotionAssetSnapshot(band: band, finalP0: PresentationPoint(x: screen.x, y: screen.y), flightStart: PresentationPoint(x: screen.x, y: screen.y), flightTangentYUp: PresentationPoint(x: contact.tangent[0], y: -contact.tangent[1]), usesCodeFallback: false)
     }
 

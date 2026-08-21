@@ -35,13 +35,18 @@ final class SpearThrowView: NSView {
         if let snapshot = assets?.snapshot(for: band, in: self) { return snapshot }
         let fallback = MotionAssetSnapshot.fallback(for: band)
         let local = NSPoint(x: fallback.finalP0.x, y: 110 - fallback.finalP0.y)
-        let screen = convertToScreen(NSRect(origin: local, size: .zero)).origin
+        // An unattached view has no screen coordinate; retain the explicit local fallback for that non-visible state.
+        guard let window else { return fallback }
+        let windowPoint = convert(NSRect(origin: local, size: .zero), to: nil).origin
+        let screen = window.convertToScreen(NSRect(origin: windowPoint, size: .zero)).origin
         return fallback.withFlightStart(PresentationPoint(x: screen.x, y: screen.y))
     }
 
     /// Core Animation switches only the selected discrete source frames: entry → 053 → 107 → 160 over 160ms.
     func playReleaseFrames() {
-        guard let assets, let images = selectedBand.releaseFiles.compactMap({ assets.image(named: $0) as NSImage? }), images.count == 4 else { return }
+        guard let assets else { return }
+        let images: [NSImage] = selectedBand.releaseFiles.compactMap { assets.image(named: $0) }
+        guard images.count == 4 else { return }
         let cgImages = images.compactMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
         guard cgImages.count == 4 else { return }
         assetLayer.contents = cgImages[3]

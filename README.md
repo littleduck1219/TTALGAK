@@ -37,3 +37,22 @@ python3 Tools/regenerate_motion_pngs.py
 python3 Tests/verify_project.py
 python3 -m py_compile Tests/verify_project.py Tools/regenerate_motion_pngs.py
 ```
+
+## AppKit compile recovery
+
+`NSView` has no `convertToScreen`. Asset and code-drawn fallback points now use the public chain `view local → view.convert(_:to:nil) window coordinates → owning NSWindow.convertToScreen(_:)`; an unattached fallback remains local only because it has no screen coordinate. FlightPanel converts its content origin through `panel.convertToScreen(_:)`, whose meaning is the panel content origin in screen coordinates—not a guessed panel frame. Release images bind `assets` optionally, then build `[NSImage]` with `compactMap` and verify its count.
+
+The Linux static guard rejects unqualified or `NSView`-identifier `convertToScreen` calls and optional-binding a `compactMap` array while preserving valid `NSWindow`/`NSPanel` conversion calls. It does not compile AppKit.
+
+Representative Mac acceptance (required before motion QA):
+
+```bash
+cd /Users/littleduck/Documents/GitHub/TTALGAK
+git pull --ff-only origin main
+swift package describe
+swift test
+swift build
+swift run TTALGAK
+```
+
+Proceed to motion QA only if `swift build` exits 0. Return the command output and exit status; Linux static validation is not a substitute.
