@@ -27,7 +27,19 @@ assert 96.0 >= 72.0
 assert 66 - 72 / math.sqrt(2) >= 0 and 58 - 72 / math.sqrt(2) >= 0
 assert 'PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)' in overlay
 assert 'groundY = Double(bottomY + 16)' in overlay and 'seedY = [64.0, 132.0, 200.0]' in overlay
-assert 'DisplayPanel(frame: screen.frame)' in overlay and 'SceneView' in overlay and 'FlightView' in overlay
+assert 'DisplayPanel(frame: screen.frame)' in overlay and 'SceneView' in overlay
+# Scene owns actor, target, result, and the one ephemeral flying spear; flight must not replace it.
+assert 'private var flightPanel' not in overlay
+assert 'flightPanel?.orderOut' not in overlay
+assert overlay.count('scenePanel?.orderOut(nil)') == 1
+assert 'scene.flightPath = path' in overlay and 'scene.flightElapsed = 0' in overlay
+assert 'scene.flightElapsed = flightElapsed' in overlay
+assert 'flightPath = nil' in overlay
+assert 'var flightPath: BallisticFlightPath?' in view
+assert 'var flightElapsed = 0.0' in view
+assert 'if let flightPath { drawSpear(path: flightPath, elapsed: flightElapsed) }' in view
+assert 'final class FlightView' not in view
+assert 'override var isOpaque: Bool { false }' in view
 assert 'actorStartZone: NSRect { NSRect(x: 44, y: 36, width: 44, height: 44) }' in view
 assert 'let ground = NSBezierPath()' not in view and 'ground.stroke()' not in view
 assert 'ignoresMouseEvents = FlightLayerContract.visibilityOnly.ignoresMouseEvents' in overlay
