@@ -10,14 +10,15 @@ final class OverlayController {
     private var gesture = LocalGesture()
     private var currentLaunch: FrozenLaunch?
     private var path: BallisticFlightPath?
-    private var target = PresentationPoint(x: 0, y: 0)
+    private var targetLifecycle = TargetLifecycle()
+    private var groundInventory = GroundSpearInventory()
     private var groundY = 0.0
     private var flightElapsed = 0.0
     private var flightClock = FlightClock()
     private var flightTimer: Timer?
     private var resetTimer: Timer?
-    private var round = 0
     private var reducedMotion = false
+    private var target: PresentationPoint { targetLifecycle.target ?? PresentationPoint(x: 0, y: 0) }
 
     var isVisible: Bool { !panels.isEmpty }
     func toggle() { isVisible ? hide() : show() }
@@ -28,6 +29,7 @@ final class OverlayController {
         left.contentView = SpearThrowView(frame: .zero) { [weak self] event in self?.handle(event) }
         panels = [left, right]
         reposition()
+        spawnTarget()
         panels.forEach { $0.orderFrontRegardless() }
         showScene()
     }
@@ -40,9 +42,12 @@ final class OverlayController {
         panels[0].setFrame(NSRect(x: frame.minX + leftInset, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
         panels[1].setFrame(NSRect(x: frame.maxX - boxSize.width, y: bottomY, width: boxSize.width, height: boxSize.height), display: true)
         groundY = Double(bottomY + 16)
-        let seedY = [64.0, 132.0, 200.0][round % 3]
-        target = PresentationPoint(x: Double(panels[1].frame.minX + 132), y: groundY + seedY)
         refreshScene()
+    }
+
+    private func spawnTarget() {
+        guard let screen = NSScreen.main else { return }
+        targetLifecycle.spawn(screenMinX: Double(screen.frame.minX), screenMaxX: Double(screen.frame.maxX), groundY: groundY)
     }
 
     private func showScene() {
@@ -61,6 +66,7 @@ final class OverlayController {
         guard let scene = scenePanel?.contentView as? SceneView else { return }
         scene.inputFrame = panels.first?.frame ?? .zero
         scene.target = target
+        scene.groundSpears = groundInventory.spears
         scene.aiming = game.phase == .aiming ? currentLaunch : nil
         scene.result = result.map { (hit: $0.0, point: $0.1) }
     }
@@ -114,10 +120,7 @@ final class OverlayController {
         flightElapsed = min(flightElapsed + delta, path.groundCrossing.elapsed)
         if let hit = SpearCollision.firstImpact(path: path, target: target, fromElapsed: previous, toElapsed: flightElapsed) { resolve(hit: true, point: path.sample(elapsed: hit).tip); return }
         scene.flightElapsed = flightElapsed
-        if flightElapsed >= path.groundCrossing.elapsed {
-            let point = path.groundCrossing.tip
-            if let screen = NSScreen.main, point.x < Double(screen.frame.minX) || point.x > Double(screen.frame.maxX) { resolve(hit: false, point: point) } else { resolve(hit: false, point: point) }
-        }
+        if flightElapsed >= path.groundCrossing.elapsed { resolve(hit: false, point: path.groundCrossing.tip) }
     }
 
     private func resolve(hit: Bool, point: PresentationPoint) {
@@ -125,12 +128,14 @@ final class OverlayController {
         flightTimer?.invalidate(); flightTimer = nil
         (scenePanel?.contentView as? SceneView)?.flightPath = nil
         game.resolve(hit: hit)
+        if let path { groundInventory.record(hit: hit, tail: path.groundCrossing.tail, tip: path.groundCrossing.tip) }
         refreshScene(result: (hit, point))
         resetTimer?.invalidate()
         resetTimer = Timer.scheduledTimer(withTimeInterval: reducedMotion ? 0.5 : 0.36, repeats: false) { [weak self] _ in
             guard let self else { return }
-            self.game.reset(); self.currentLaunch = nil; self.path = nil; self.round += 1
-            self.reposition(); self.refreshScene()
+            self.game.reset(); self.currentLaunch = nil; self.path = nil
+            if hit { self.spawnTarget() }
+            self.refreshScene()
         }
     }
 

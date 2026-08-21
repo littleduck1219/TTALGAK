@@ -19,6 +19,7 @@ final class SpearThrowView: NSView {
 final class SceneView: NSView {
     var inputFrame = NSRect.zero { didSet { needsDisplay = true } }
     var target = PresentationPoint(x: 0, y: 0) { didSet { needsDisplay = true } }
+    var groundSpears: [GroundSpearRecord] = [] { didSet { needsDisplay = true } }
 
     var aiming: FrozenLaunch? { didSet { needsDisplay = true } }
     var result: (hit: Bool, point: PresentationPoint)? { didSet { needsDisplay = true } }
@@ -32,6 +33,10 @@ final class SceneView: NSView {
         let localGround = inputFrame.minY + 16 - CGFloat(screenOrigin.y)
         let feet = NSPoint(x: inputFrame.minX + 48 - CGFloat(screenOrigin.x), y: localGround)
         drawActor(feet: feet)
+        for spear in groundSpears {
+            let landed = NSBezierPath()
+            landed.move(to: local(spear.tail)); landed.line(to: local(spear.tip)); landed.lineWidth = 3.5; landed.lineCapStyle = .round; landed.stroke()
+        }
         let center = local(target); for radius: CGFloat in [22, 10] { let ring = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)); ring.lineWidth = 3.5; ring.stroke() }
         if let aiming { drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming) }
         if let flightPath { drawSpear(path: flightPath, elapsed: flightElapsed) }

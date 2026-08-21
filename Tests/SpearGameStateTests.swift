@@ -8,8 +8,64 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 48), 65, accuracy: 0.0001)
         let angle = 45.0
         XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -6 / sqrt(2), y: -6 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -72 / sqrt(2), y: -72 / sqrt(2)), angleDegrees: angle), 1, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: 72 / sqrt(2), y: 72 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -83 / sqrt(2), y: -83 / sqrt(2)), angleDegrees: angle), 0.5, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -160 / sqrt(2), y: -160 / sqrt(2)), angleDegrees: angle), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -72 / sqrt(2), y: -72 / sqrt(2)), angleDegrees: angle), (72.0 - 6) / 154, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: 160 / sqrt(2), y: 160 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
+    }
+
+    func testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest() {
+        XCTAssertEqual(GroundSpearInventory.capacity, 50)
+        var inventory = GroundSpearInventory()
+        for index in 0..<51 {
+            inventory.record(hit: false, tail: PresentationPoint(x: Double(index), y: 16), tip: PresentationPoint(x: Double(index) + 42, y: 16))
+        }
+        XCTAssertEqual(inventory.spears.count, 50)
+        XCTAssertEqual(inventory.spears.first?.tail.x ?? -1, 1, accuracy: 0.0001)
+        XCTAssertEqual(inventory.spears.last?.tail.x ?? -1, 50, accuracy: 0.0001)
+    }
+
+    func testHitSpearsAreNeverAddedToGroundInventory() {
+        var inventory = GroundSpearInventory()
+        inventory.record(hit: true, tail: PresentationPoint(x: 300, y: 200), tip: PresentationPoint(x: 342, y: 200))
+        XCTAssertTrue(inventory.spears.isEmpty)
+        inventory.record(hit: false, tail: PresentationPoint(x: 400, y: 16), tip: PresentationPoint(x: 442, y: 16))
+        XCTAssertEqual(inventory.spears.count, 1)
+        XCTAssertEqual(inventory.spears[0].tail, PresentationPoint(x: 400, y: 16))
+        XCTAssertEqual(inventory.spears[0].tip, PresentationPoint(x: 442, y: 16))
+    }
+
+    func testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights() {
+        var units = [0.0, 0.5, 1.0, 2.0]
+        var lifecycle = TargetLifecycle(unit: { units.removeFirst() })
+        let spawns = (0..<4).map { _ in lifecycle.spawn(screenMinX: 0, screenMaxX: 1600, groundY: 100) }
+        XCTAssertEqual(spawns[0].x, 1600 - 280, accuracy: 0.0001)
+        XCTAssertEqual(spawns[1].x, 1600 - 400, accuracy: 0.0001)
+        XCTAssertEqual(spawns[2].x, 1600 - 520, accuracy: 0.0001)
+        XCTAssertEqual(spawns[3].x, 1600 - 520, accuracy: 0.0001)
+        XCTAssertEqual(spawns.map(\.y), [164, 232, 300, 164])
+        for spawn in spawns {
+            XCTAssertGreaterThanOrEqual(1600 - spawn.x, 280)
+            XCTAssertLessThanOrEqual(1600 - spawn.x, 520)
+        }
+        var narrow = TargetLifecycle(unit: { 1 })
+        let clamped = narrow.spawn(screenMinX: 1500, screenMaxX: 1600, groundY: 0)
+        XCTAssertEqual(clamped.x, 1500 + 22, accuracy: 0.0001)
+    }
+
+    func testTargetStableOnMissAndChangesOnlyOnHit() {
+        var units = [0.0, 1.0]
+        var lifecycle = TargetLifecycle(unit: { units.removeFirst() })
+        let initial = lifecycle.spawn(screenMinX: 0, screenMaxX: 1600, groundY: 100)
+        lifecycle.resolve(hit: false, screenMinX: 0, screenMaxX: 1600, groundY: 100)
+        XCTAssertEqual(lifecycle.target, initial)
+        lifecycle.resolve(hit: false, screenMinX: 0, screenMaxX: 1600, groundY: 100)
+        XCTAssertEqual(lifecycle.target, initial)
+        lifecycle.resolve(hit: true, screenMinX: 0, screenMaxX: 1600, groundY: 100)
+        XCTAssertNotEqual(lifecycle.target, initial)
+        XCTAssertEqual(lifecycle.target?.x ?? 0, 1600 - 520, accuracy: 0.0001)
+        XCTAssertEqual(lifecycle.target?.y ?? 0, 232, accuracy: 0.0001)
+        XCTAssertTrue(units.isEmpty)
     }
 
     func testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle() {
@@ -52,6 +108,18 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertGreaterThan(outside?.power ?? 0, 0)
         XCTAssertEqual(gesture.release(isInsideInput: false), outside)
         XCTAssertNil(gesture.release(isInsideInput: false))
+    }
+
+    func testMaxPowerNeedsFullOneSixtyPullOutsideLocalInput() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        let tangent = DragLaunch.tangent(angleDegrees: 25)
+        let almost = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 159, y: 48 - tangent.y * 159), isInsideInput: false)
+        XCTAssertLessThan(almost?.power ?? 1, 1)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: false)
+        XCTAssertEqual(full?.angleDegrees ?? 0, 25, accuracy: 0.0001)
+        XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
+        XCTAssertEqual(gesture.release(isInsideInput: false), full)
     }
 
     func testGestureNextValidDownDiscardsStaleLaunch() {

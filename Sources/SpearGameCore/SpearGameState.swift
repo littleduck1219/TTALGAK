@@ -42,7 +42,52 @@ public enum DragLaunch {
         let tangent = tangent(angleDegrees: angleDegrees)
         let reverse = max(0, -(displacement.x * tangent.x + displacement.y * tangent.y))
         if reverse <= 6 { return 0 }
-        return min((reverse - 6) / 66, 1)
+        return min((reverse - 6) / 154, 1)
+    }
+}
+
+public struct GroundSpearRecord: Equatable {
+    public let tail: PresentationPoint
+    public let tip: PresentationPoint
+    public init(tail: PresentationPoint, tip: PresentationPoint) { self.tail = tail; self.tip = tip }
+}
+
+/// In-memory-only FIFO of ground-miss spears; hits are never retained and nothing is persisted to disk or network.
+public struct GroundSpearInventory: Equatable {
+    public static let capacity = 50
+    public private(set) var spears: [GroundSpearRecord] = []
+    public init() {}
+    public mutating func record(hit: Bool, tail: PresentationPoint, tip: PresentationPoint) {
+        guard !hit else { return }
+        spears.append(GroundSpearRecord(tail: tail, tip: tip))
+        if spears.count > Self.capacity { spears.removeFirst(spears.count - Self.capacity) }
+    }
+}
+
+/// Target spawns only at show/new-game and on an actual hit; misses, resets, and flight never move it,
+/// and the stored position never feeds launch velocity or physics.
+public struct TargetLifecycle {
+    public static let minInset = 280.0
+    public static let maxInset = 520.0
+    public static let edgeMargin = 22.0
+    public static let seedHeights = [64.0, 132.0, 200.0]
+    public private(set) var target: PresentationPoint?
+    private let unit: () -> Double
+    private var spawnCount = 0
+    public init(unit: @escaping () -> Double = { Double.random(in: 0...1) }) { self.unit = unit }
+    @discardableResult
+    public mutating func spawn(screenMinX: Double, screenMaxX: Double, groundY: Double) -> PresentationPoint {
+        let clampedUnit = min(max(unit(), 0), 1)
+        let inset = Self.minInset + (Self.maxInset - Self.minInset) * clampedUnit
+        let x = min(max(screenMaxX - inset, screenMinX + Self.edgeMargin), screenMaxX - Self.edgeMargin)
+        let value = PresentationPoint(x: x, y: groundY + Self.seedHeights[spawnCount % Self.seedHeights.count])
+        spawnCount += 1
+        target = value
+        return value
+    }
+    public mutating func resolve(hit: Bool, screenMinX: Double, screenMaxX: Double, groundY: Double) {
+        guard hit else { return }
+        spawn(screenMinX: screenMinX, screenMaxX: screenMaxX, groundY: groundY)
     }
 }
 
