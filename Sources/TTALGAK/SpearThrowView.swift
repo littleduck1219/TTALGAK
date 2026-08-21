@@ -22,7 +22,10 @@ final class SceneView: NSView {
 
     var aiming: FrozenLaunch? { didSet { needsDisplay = true } }
     var result: (hit: Bool, point: PresentationPoint)? { didSet { needsDisplay = true } }
+    var flightPath: BallisticFlightPath? { didSet { needsDisplay = true } }
+    var flightElapsed = 0.0 { didSet { needsDisplay = true } }
     var screenOrigin = PresentationPoint(x: 0, y: 0)
+    override var isOpaque: Bool { false }
     private func local(_ p: PresentationPoint) -> NSPoint { NSPoint(x: CGFloat(p.x - screenOrigin.x), y: CGFloat(p.y - screenOrigin.y)) }
     override func draw(_ dirtyRect: NSRect) {
         ink.setStroke()
@@ -31,6 +34,7 @@ final class SceneView: NSView {
         drawActor(feet: feet)
         let center = local(target); for radius: CGFloat in [22, 10] { let ring = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)); ring.lineWidth = 3.5; ring.stroke() }
         if let aiming { drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming) }
+        if let flightPath { drawSpear(path: flightPath, elapsed: flightElapsed) }
         if let result { drawResult(result) }
     }
     private func drawActor(feet: NSPoint) {
@@ -45,17 +49,14 @@ final class SceneView: NSView {
         guard launch.power > 0 else { return }
         let length = 6 + 24 * launch.power; let tension = NSBezierPath(); tension.move(to: hand); tension.line(to: NSPoint(x: hand.x - CGFloat(t.x * length), y: hand.y - CGFloat(t.y * length))); tension.lineWidth = 2; tension.lineCapStyle = .round; tension.stroke()
     }
+    private func drawSpear(path: BallisticFlightPath, elapsed: Double) {
+        let sample = path.sample(elapsed: elapsed)
+        let spear = NSBezierPath()
+        spear.move(to: local(sample.tail)); spear.line(to: local(sample.tip)); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.stroke()
+    }
     private func drawResult(_ result: (hit: Bool, point: PresentationPoint)) {
         let p = local(result.point); let mark = NSBezierPath()
         if result.hit { mark.appendArc(withCenter: p, radius: 28, startAngle: 0, endAngle: 360, clockwise: false) } else { mark.move(to: NSPoint(x: p.x - 6, y: p.y - 6)); mark.line(to: NSPoint(x: p.x + 6, y: p.y + 6)); mark.move(to: NSPoint(x: p.x - 6, y: p.y + 6)); mark.line(to: NSPoint(x: p.x + 6, y: p.y - 6)) }
         mark.lineWidth = 2.5; mark.stroke()
     }
-}
-
-final class FlightView: NSView {
-    var path: BallisticFlightPath? { didSet { needsDisplay = true } }
-    var elapsed = 0.0 { didSet { needsDisplay = true } }
-    var screenOrigin = PresentationPoint(x: 0, y: 0)
-    override func draw(_ dirtyRect: NSRect) { guard let path else { return }; let sample = path.sample(elapsed: elapsed); drawSpear(tail: NSPoint(x: CGFloat(sample.tail.x - screenOrigin.x), y: CGFloat(sample.tail.y - screenOrigin.y)), tip: NSPoint(x: CGFloat(sample.tip.x - screenOrigin.x), y: CGFloat(sample.tip.y - screenOrigin.y))) }
-    private func drawSpear(tail: NSPoint, tip: NSPoint) { ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.stroke() }
 }

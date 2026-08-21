@@ -6,7 +6,6 @@ final class OverlayController {
     private let leftInset = 96.0
     private var panels: [GamePanel] = []
     private var scenePanel: DisplayPanel?
-    private var flightPanel: DisplayPanel?
     private var game = SpearGameState()
     private var gesture = LocalGesture()
     private var currentLaunch: FrozenLaunch?
@@ -32,7 +31,7 @@ final class OverlayController {
         panels.forEach { $0.orderFrontRegardless() }
         showScene()
     }
-    func hide() { stopTimers(); flightPanel?.orderOut(nil); scenePanel?.orderOut(nil); flightPanel = nil; scenePanel = nil; panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
+    func hide() { stopTimers(); scenePanel?.orderOut(nil); scenePanel = nil; panels.forEach { $0.orderOut(nil) }; panels.removeAll() }
 
     func reposition() {
         guard panels.count == 2, let screen = NSScreen.main else { return }
@@ -48,7 +47,6 @@ final class OverlayController {
 
     private func showScene() {
         guard let screen = NSScreen.main else { return }
-        scenePanel?.orderOut(nil)
         let panel = DisplayPanel(frame: screen.frame)
         let scene = SceneView(frame: NSRect(origin: .zero, size: screen.frame.size))
         let origin = panel.convertToScreen(NSRect(origin: .zero, size: .zero)).origin
@@ -64,7 +62,7 @@ final class OverlayController {
         scene.inputFrame = panels.first?.frame ?? .zero
         scene.target = target
         scene.aiming = game.phase == .aiming ? currentLaunch : nil
-        if let result { scene.result = (hit: result.0, point: result.1) }
+        scene.result = result.map { (hit: $0.0, point: $0.1) }
     }
 
     private func handle(_ event: SpearThrowView.Event) {
@@ -98,15 +96,9 @@ final class OverlayController {
     }
 
     private func startFlight() {
-        guard let path, let screen = NSScreen.main else { return }
-        let panel = DisplayPanel(frame: screen.frame)
-        let flight = FlightView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        let origin = panel.convertToScreen(NSRect(origin: .zero, size: .zero)).origin
-        flight.screenOrigin = PresentationPoint(x: Double(origin.x), y: Double(origin.y))
-        flight.path = path
-        panel.contentView = flight
-        flightPanel = panel
-        panel.orderFrontRegardless()
+        guard let path, let scene = scenePanel?.contentView as? SceneView else { return }
+        scene.flightPath = path
+        scene.flightElapsed = 0
         flightElapsed = 0
         flightClock = FlightClock()
         let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.advanceFlight() }
@@ -115,13 +107,13 @@ final class OverlayController {
     }
 
     private func advanceFlight() {
-        guard let path, game.phase == .flying else { return }
+        guard let path, game.phase == .flying, let scene = scenePanel?.contentView as? SceneView else { return }
         let delta = flightClock.advance(now: ProcessInfo.processInfo.systemUptime)
         guard delta > 0 else { return }
         let previous = flightElapsed
         flightElapsed = min(flightElapsed + delta, path.groundCrossing.elapsed)
         if let hit = SpearCollision.firstImpact(path: path, target: target, fromElapsed: previous, toElapsed: flightElapsed) { resolve(hit: true, point: path.sample(elapsed: hit).tip); return }
-        (flightPanel?.contentView as? FlightView)?.elapsed = flightElapsed
+        scene.flightElapsed = flightElapsed
         if flightElapsed >= path.groundCrossing.elapsed {
             let point = path.groundCrossing.tip
             if let screen = NSScreen.main, point.x < Double(screen.frame.minX) || point.x > Double(screen.frame.maxX) { resolve(hit: false, point: point) } else { resolve(hit: false, point: point) }
@@ -131,7 +123,7 @@ final class OverlayController {
     private func resolve(hit: Bool, point: PresentationPoint) {
         guard game.phase == .flying else { return }
         flightTimer?.invalidate(); flightTimer = nil
-        flightPanel?.orderOut(nil); flightPanel = nil
+        (scenePanel?.contentView as? SceneView)?.flightPath = nil
         game.resolve(hit: hit)
         refreshScene(result: (hit, point))
         resetTimer?.invalidate()
