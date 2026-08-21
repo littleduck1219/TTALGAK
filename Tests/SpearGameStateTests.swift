@@ -19,18 +19,18 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertEqual(DragLaunch.reversePull(displacement: PresentationPoint(x: -100 / sqrt(2), y: -100 / sqrt(2)), tangent: tangent), 100, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.reversePull(displacement: PresentationPoint(x: 100 / sqrt(2), y: 100 / sqrt(2)), tangent: tangent), 0, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.power(rawPull: 6), 0, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(rawPull: 7), 1.0 / 154, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(rawPull: 83), 0.5, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(rawPull: 160), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 7), 1.0 / 58, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 32), 26.0 / 58, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 64), 1, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.power(rawPull: 999), 1, accuracy: 0.0001)
     }
 
-    func testFixedOneSixtyPullPowerAndSubstantialTension() {
-        XCTAssertEqual(DragLaunch.fullPowerPull, 160, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(rawPull: 160), 1, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 160), 160, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.power(rawPull: 80), 74.0 / 154, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 80), 80, accuracy: 0.0001)
+    func testCompactSixtyFourPullUsesFiftyEightLiveRangeAndSixtyFourTension() {
+        XCTAssertEqual(DragLaunch.fullPowerPull, 64, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 64), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 64), 64, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(rawPull: 32), 26.0 / 58, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: 32), 32, accuracy: 0.0001)
         XCTAssertEqual(DragLaunch.tensionLength(rawPull: 6), 0, accuracy: 0.0001)
         let clamped = FrozenLaunch(angleDegrees: 45, power: 0.5, rawPull: -5, start: PresentationPoint(x: 0, y: 0))
         XCTAssertEqual(clamped.rawPull, 0, accuracy: 0.0001)
@@ -153,24 +153,24 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertNil(gesture.release(isInsideInput: false))
     }
 
-    func testFixedFullPowerNeedsOneSixtyPullOutsideLocalInput() {
+    func testFixedFullPowerNeedsOnlySixtyFourPointLocalPull() {
         var gesture = LocalGesture()
         XCTAssertTrue(beginCentered(&gesture))
         let tangent = DragLaunch.tangent(angleDegrees: 45)
-        let almost = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 159, y: 48 - tangent.y * 159), isInsideInput: false)
+        let almost = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 63, y: 48 - tangent.y * 63), isInsideInput: true)
         XCTAssertLessThan(almost?.power ?? 1, 1)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: false)
-        XCTAssertEqual(full?.rawPull ?? 0, 160, accuracy: 1e-9)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 64, y: 48 - tangent.y * 64), isInsideInput: true)
+        XCTAssertEqual(full?.rawPull ?? 0, 64, accuracy: 1e-9)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 160, accuracy: 1e-9)
-        XCTAssertEqual(gesture.release(isInsideInput: false), full)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 64, accuracy: 1e-9)
+        XCTAssertEqual(gesture.release(isInsideInput: true), full)
     }
 
     func testGestureNeedsNoScreenEdgeData() {
         var gesture = LocalGesture()
         XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
         let tangent = DragLaunch.tangent(angleDegrees: 45)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: false)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 64, y: 48 - tangent.y * 64), isInsideInput: true)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 0.0001)
     }
 
@@ -196,7 +196,7 @@ final class SpearGameStateTests: XCTestCase {
         let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
         XCTAssertGreaterThan(latched?.power ?? 0, 0)
         let pulled = gesture.move(to: PresentationPoint(x: 28 - tangent.x * 40, y: 48 - tangent.y * 40), isInsideInput: true)
-        XCTAssertEqual(pulled?.power ?? 0, (latched?.power ?? 0) + 40 / 154, accuracy: 0.0001)
+        XCTAssertEqual(pulled?.power ?? 0, min((latched?.power ?? 0) + 40 / 58, 1), accuracy: 0.0001)
         XCTAssertGreaterThan(pulled?.power ?? 0, latched?.power ?? 1)
     }
 
@@ -206,14 +206,14 @@ final class SpearGameStateTests: XCTestCase {
         let latched = gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true)
         XCTAssertGreaterThan(latched?.power ?? 0, 0)
         let tangent = DragLaunch.tangent(angleDegrees: 45)
-        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 80, y: 48 - tangent.y * 80), isInsideInput: true)
-        XCTAssertEqual(halfway?.rawPull ?? 0, 80, accuracy: 1e-9)
-        XCTAssertEqual(halfway?.power ?? 0, 74.0 / 154, accuracy: 0.0001)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: true)
-        XCTAssertEqual(full?.rawPull ?? 0, 160, accuracy: 1e-9)
+        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 32, y: 48 - tangent.y * 32), isInsideInput: true)
+        XCTAssertEqual(halfway?.rawPull ?? 0, 32, accuracy: 1e-9)
+        XCTAssertEqual(halfway?.power ?? 0, 26.0 / 58, accuracy: 0.0001)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 64, y: 48 - tangent.y * 64), isInsideInput: true)
+        XCTAssertEqual(full?.rawPull ?? 0, 64, accuracy: 1e-9)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
         XCTAssertEqual(full?.angleDegrees ?? 0, 45, accuracy: 0.0001)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 160, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 64, accuracy: 1e-9)
         XCTAssertEqual(gesture.release(isInsideInput: true), full)
     }
 
@@ -221,18 +221,18 @@ final class SpearGameStateTests: XCTestCase {
         var gesture = LocalGesture()
         XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
-        let pulled = gesture.move(to: PresentationPoint(x: 48 - 80 / sqrt(2.0), y: 48), isInsideInput: true)
-        XCTAssertEqual(pulled?.rawPull ?? 0, 80, accuracy: 1e-9)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: pulled?.rawPull ?? 0), 80, accuracy: 1e-9)
-        let raised = gesture.move(to: PresentationPoint(x: 48 - 80 / sqrt(2.0), y: 72), isInsideInput: true)
+        let pulled = gesture.move(to: PresentationPoint(x: 48 - 32 / sqrt(2.0), y: 48), isInsideInput: true)
+        XCTAssertEqual(pulled?.rawPull ?? 0, 32, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: pulled?.rawPull ?? 0), 32, accuracy: 1e-9)
+        let raised = gesture.move(to: PresentationPoint(x: 48 - 32 / sqrt(2.0), y: 72), isInsideInput: true)
         XCTAssertEqual(raised?.angleDegrees ?? 0, 55, accuracy: 0.0001)
         XCTAssertEqual(raised?.rawPull, pulled?.rawPull)
         XCTAssertEqual(raised?.power, pulled?.power)
-        let lowered = gesture.move(to: PresentationPoint(x: 48 - 80 / sqrt(2.0), y: 24), isInsideInput: true)
+        let lowered = gesture.move(to: PresentationPoint(x: 48 - 32 / sqrt(2.0), y: 24), isInsideInput: true)
         XCTAssertEqual(lowered?.angleDegrees ?? 0, 27.5, accuracy: 0.0001)
         XCTAssertEqual(lowered?.rawPull, pulled?.rawPull)
         XCTAssertEqual(lowered?.power, pulled?.power)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: lowered?.rawPull ?? 0), 80, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: lowered?.rawPull ?? 0), 32, accuracy: 1e-9)
     }
 
     func testFurtherFrozenAxisPullGrowsRawPullVisibleTensionAndPower() {
@@ -240,11 +240,11 @@ final class SpearGameStateTests: XCTestCase {
         XCTAssertTrue(beginCentered(&gesture))
         XCTAssertNotNil(gesture.move(to: PresentationPoint(x: 28, y: 48), isInsideInput: true))
         let tangent = DragLaunch.tangent(angleDegrees: 45)
-        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 80, y: 48 - tangent.y * 80), isInsideInput: true)
-        XCTAssertEqual(halfway?.rawPull ?? 0, 80, accuracy: 1e-9)
-        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 160, y: 48 - tangent.y * 160), isInsideInput: true)
-        XCTAssertEqual(full?.rawPull ?? 0, 160, accuracy: 1e-9)
-        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 160, accuracy: 1e-9)
+        let halfway = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 32, y: 48 - tangent.y * 32), isInsideInput: true)
+        XCTAssertEqual(halfway?.rawPull ?? 0, 32, accuracy: 1e-9)
+        let full = gesture.move(to: PresentationPoint(x: 48 - tangent.x * 64, y: 48 - tangent.y * 64), isInsideInput: true)
+        XCTAssertEqual(full?.rawPull ?? 0, 64, accuracy: 1e-9)
+        XCTAssertEqual(DragLaunch.tensionLength(rawPull: full?.rawPull ?? 0), 64, accuracy: 1e-9)
         XCTAssertEqual(full?.power ?? 0, 1, accuracy: 1e-9)
         XCTAssertGreaterThan(full?.rawPull ?? 0, halfway?.rawPull ?? 1)
         XCTAssertEqual(gesture.release(isInsideInput: true), full)

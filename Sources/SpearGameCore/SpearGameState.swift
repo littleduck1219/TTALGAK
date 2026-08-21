@@ -34,7 +34,9 @@ public struct FlightLayerContract: Equatable {
 
 public enum DragLaunch {
     public static let deadZone = 6.0
-    public static let fullPowerPull = 160.0
+    public static let fullPowerPull = 64.0
+    public static let livePowerPull = 58.0
+    public static let maximumTensionLength = 64.0
     // Asymmetric range around center 45: downward drag spans 35 degrees to the 10-degree floor,
     // upward drag spans 20 degrees to the 65-degree ceiling, both over the same 48pt travel.
     public static func angle(forVerticalDrag dy: Double) -> Double { min(max(45 + (dy < 0 ? 35 : 20) * dy / 48, 10), 65) }
@@ -47,11 +49,11 @@ public enum DragLaunch {
     }
     public static func power(rawPull: Double) -> Double {
         guard rawPull > deadZone else { return 0 }
-        return min((rawPull - deadZone) / 154, 1)
+        return min((rawPull - deadZone) / livePowerPull, 1)
     }
     public static func tensionLength(rawPull: Double) -> Double {
         guard rawPull > deadZone else { return 0 }
-        return min(rawPull / 160 * 160, 160)
+        return min(rawPull / fullPowerPull * maximumTensionLength, maximumTensionLength)
     }
 }
 

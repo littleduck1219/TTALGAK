@@ -26,13 +26,15 @@ assert 'leftInset = 96.0' in overlay and 'x: frame.minX + leftInset' in overlay
 assert 'PresentationPoint(x: Double(left.frame.minX + 66), y: groundY + 42)' in overlay
 assert 'groundY = Double(bottomY + 16)' in overlay
 
-# Fixed 160pt physical pull: 6pt dead zone and exact 154pt live denominator.
-assert '320' not in core and '/ 314' not in core and '/ 66' not in core
+# Compact fixed physical pull: 6pt dead zone, 64pt maximum, and exact 58pt live denominator.
+assert '320' not in core and '/ 314' not in core and '/ 154' not in core and 'fullPowerPull = 160' not in core
 assert 'deadZone = 6.0' in core
-assert 'fullPowerPull = 160.0' in core
-assert '(rawPull - deadZone) / 154' in core
-assert 'testFixedOneSixtyPullPowerAndSubstantialTension' in tests
-assert 'testFixedFullPowerNeedsOneSixtyPullOutsideLocalInput' in tests
+assert 'fullPowerPull = 64.0' in core
+assert 'livePowerPull = 58.0' in core
+assert 'maximumTensionLength = 64.0' in core
+assert '(rawPull - deadZone) / livePowerPull' in core
+assert 'testCompactSixtyFourPullUsesFiftyEightLiveRangeAndSixtyFourTension' in tests
+assert 'testFixedFullPowerNeedsOnlySixtyFourPointLocalPull' in tests
 assert 'testGestureNeedsNoScreenEdgeData' in tests
 
 # Asymmetric angle range 10...65 around center 45: dy=-48 -> 10 (slope 35/48 down), dy=+48 -> 65 (slope 20/48 up).
@@ -63,9 +65,9 @@ assert 'testNoDeadZoneCrossingMeansAngleMovesNeverLatchPower' in tests
 assert 'XCTAssertEqual(raised?.power, latched?.power)' in tests
 assert 'XCTAssertEqual(lowered?.power, latched?.power)' in tests
 
-# Visible pull uses the fixed physical pull and remains a full 160pt at full raw pull.
+# Visible pull uses the compact fixed physical pull and reaches 64pt at full raw pull.
 assert 'public let rawPull: Double' in core and 'self.rawPull = max(rawPull, 0)' in core
-assert 'rawPull / 160 * 160' in core
+assert 'rawPull / fullPowerPull * maximumTensionLength' in core
 assert 'rawPull: rawPull, start: start' in core
 assert 'DragLaunch.tensionLength(rawPull: launch.rawPull)' in view
 assert '6 + 24 * launch.power' not in view
@@ -73,14 +75,17 @@ assert 'guard launch.power > 0' not in view
 assert 'drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming)' in view
 assert 'testVerticalAngleOnlyMovePreservesRawPullPowerAndTension' in tests
 assert 'testFurtherFrozenAxisPullGrowsRawPullVisibleTensionAndPower' in tests
-assert 'tensionLength(rawPull: 80), 80' in tests
-assert 'tensionLength(rawPull: 160), 160' in tests
+assert 'tensionLength(rawPull: 32), 32' in tests
+assert 'tensionLength(rawPull: 64), 64' in tests
 
 # Rejected screen-bound, capture-corridor, and screen conversion features must stay absent.
 for forbidden in ('ScreenBounds', 'PullCorridor', 'CorridorTile', 'GestureCorridor', 'CorridorPanel', 'CorridorView', 'dynamic max pull', 'move(toScreenPoint'):
     assert forbidden not in all_source
     assert forbidden not in tests
     assert forbidden not in readme
+for forbidden in ('extraInputWindow', 'displayEdgeCapture', 'edgeDragCapture'):
+    assert forbidden not in all_source
+    assert forbidden not in tests
 assert 'case down(PresentationPoint)' in view
 assert 'convertToScreen' not in view
 assert 'mouseLocation' not in all_source
@@ -131,7 +136,7 @@ for expected in ('gravity = 2400.0', 'shaftLength = 42.0', 'v0 = 900 + 1000 * se
     assert expected in core
 for forbidden in ('targetX', 'canonicalHeight', 'canonicalAim', 'launchCoefficient', 'coefficient(for:', 'normalizedLanding', 'PresentationFlightPath', 'CGEventTap', 'CGEventPost', 'CGEventSource', 'CGWarpMouseCursorPosition', 'CGAssociateMouseAndMouseCursorPosition', 'NSEvent.mouseLocation', 'mouseLocationOutsideOfEventStream', 'NSEvent.addGlobalMonitorForEvents', 'NSEvent.addLocalMonitorForEvents', 'ScreenCaptureKit', 'AXUIElement', 'AXIsProcessTrusted', 'URLSession', 'NSPasteboard', 'UserDefaults', 'FileManager', 'NSKeyedArchiver', 'CGWindowList', 'NSWindowSharing'):
     assert forbidden not in all_source
-for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testFixedFullPowerNeedsOneSixtyPullOutsideLocalInput', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
+for expected in ('testDragMapsExactAngleAndReverseTangentPower', 'testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle', 'testAnglesHaveDifferentApexAndLandingAtSamePower', 'testTargetIsNotLaunchInputAndGroundCrossingIsPhysical', 'testActualShaftSegmentCollisionAndGroundMiss', 'testGestureKeepsOutsideDragAndReleasesOnce', 'testGestureNextValidDownDiscardsStaleLaunch', 'testFixedFullPowerNeedsOnlySixtyFourPointLocalPull', 'testGroundInventoryKeepsMissesCapsAtFiftyAndEvictsOldest', 'testHitSpearsAreNeverAddedToGroundInventory', 'testTargetSpawnsWithinRightInsetRangeAndDeterministicSeedHeights', 'testTargetStableOnMissAndChangesOnlyOnHit'):
     assert expected in tests
 assert 'RunLoop.main.add(timer, forMode: .common)' in overlay and 'ProcessInfo.processInfo.systemUptime' in overlay
-print('PASS: TTALGAK v3 local drag (fixed 160pt full pull, asymmetric angle 10...65), ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
+print('PASS: TTALGAK v3 compact local drag (6pt dead zone, fixed 64pt full pull, 58pt live range, 64pt tension), asymmetric angle 10...65, ground-miss FIFO 50, hit-only target lifecycle 280...520, true ballistic physics, non-clipping display scene, and safety guardrails')
