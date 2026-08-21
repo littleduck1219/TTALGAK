@@ -2,123 +2,63 @@ import XCTest
 @testable import SpearGameCore
 
 final class SpearGameStateTests: XCTestCase {
-    func testCanonicalTargetSetupMatchesBallisticTailAtImpact() {
-        let start = PresentationPoint(x: 48, y: 56)
-        let targetX = 1232.0
-        for target in TargetPosition.allCases {
-            let center = BallisticTarget.center(start: start, targetX: targetX, position: target)
-            let path = BallisticFlightPath(start: start, targetX: targetX, aimDegrees: target.canonicalAimDegrees)
-            let tail = path.sample(elapsed: 0.82).tail
-            XCTAssertEqual(tail.x, center.x, accuracy: 1e-6)
-            XCTAssertEqual(tail.y, center.y, accuracy: 1e-6)
-        }
+    func testDragMapsExactAngleAndReverseTangentPower() {
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: -48), 25, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 0), 45, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.angle(forVerticalDrag: 48), 65, accuracy: 0.0001)
+        let angle = 45.0
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -6 / sqrt(2), y: -6 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: -72 / sqrt(2), y: -72 / sqrt(2)), angleDegrees: angle), 1, accuracy: 0.0001)
+        XCTAssertEqual(DragLaunch.power(displacement: PresentationPoint(x: 72 / sqrt(2), y: 72 / sqrt(2)), angleDegrees: angle), 0, accuracy: 0.0001)
     }
 
-    func testBallisticLaunchApexAndDescentUseVelocityOnly() {
-        let start = PresentationPoint(x: 48, y: 56)
-        for angle in [25.0, 45.0, 65.0] {
-            let path = BallisticFlightPath(start: start, targetX: 1232, aimDegrees: angle)
-            XCTAssertEqual(path.sample(elapsed: 0).shaftAngleDegrees, angle, accuracy: 0.001)
-            let apex = path.apexElapsed
-            XCTAssertGreaterThan(apex, 0)
-            XCTAssertLessThan(apex, 0.82)
-            XCTAssertGreaterThan(path.sample(elapsed: apex - 0.001).velocity.y, 0)
-            XCTAssertLessThan(path.sample(elapsed: apex + 0.001).velocity.y, 0)
-            XCTAssertEqual(path.sample(elapsed: apex).shaftAngleDegrees, 0, accuracy: 0.001)
-            XCTAssertLessThan(path.sample(elapsed: 0.82).velocity.y, 0)
-        }
+    func testPowerProducesStrictlyIncreasingGroundDistanceAtSameAngle() {
+        let start = PresentationPoint(x: 48, y: 108)
+        let paths = [0.15, 0.50, 0.85].map { BallisticFlightPath(start: start, angleDegrees: 45, power: $0, groundY: 16) }
+        let landings = paths.map { $0.groundCrossing.tail.x }
+        XCTAssertLessThan(landings[0], landings[1])
+        XCTAssertLessThan(landings[1], landings[2])
     }
 
-    func testBallisticPositionIsMonotonicAndClampsAim() {
-        let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 56), targetX: 1232, aimDegrees: 70)
-        XCTAssertEqual(path.aimDegrees, 65, accuracy: 0.0001)
-        var previous = path.sample(elapsed: 0).tail.x
-        for step in 1...82 {
-            let x = path.sample(elapsed: Double(step) / 100).tail.x
-            XCTAssertGreaterThan(x, previous)
-            previous = x
-        }
+    func testAnglesHaveDifferentApexAndLandingAtSamePower() {
+        let paths = [25.0, 45.0, 65.0].map { BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: $0, power: 0.5, groundY: 16) }
+        XCTAssertGreaterThan(abs(paths[0].apex.y - paths[1].apex.y), 0.001)
+        XCTAssertGreaterThan(abs(paths[1].apex.y - paths[2].apex.y), 0.001)
+        XCTAssertGreaterThan(abs(paths[0].groundCrossing.tail.x - paths[1].groundCrossing.tail.x), 0.001)
+        XCTAssertGreaterThan(abs(paths[1].groundCrossing.tail.x - paths[2].groundCrossing.tail.x), 0.001)
     }
 
-    func testCollisionSamplesShaftWithFourPointMaximumSubsteps() {
-        let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 56), targetX: 1232, aimDegrees: 45)
-        let target = BallisticTarget.center(start: PresentationPoint(x: 48, y: 56), targetX: 1232, position: .middle)
-        XCTAssertNotNil(SpearCollision.firstImpact(path: path, target: target, fromElapsed: 0, toElapsed: 0.82))
-        XCTAssertNil(SpearCollision.firstImpact(path: path, target: PresentationPoint(x: target.x, y: target.y + 100), fromElapsed: 0, toElapsed: 0.82))
+    func testTargetIsNotLaunchInputAndGroundCrossingIsPhysical() {
+        let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: 45, power: 0.5, groundY: 16)
+        XCTAssertEqual(path.gravity, 2400, accuracy: 0.0001)
+        XCTAssertEqual(path.v0, 1400, accuracy: 0.0001)
+        XCTAssertEqual(path.groundCrossing.tail.y, 16, accuracy: 0.0001)
+        XCTAssertGreaterThan(path.groundCrossing.elapsed, 0)
     }
 
-    func testCollisionIsTheOnlyOutcomeAuthority() {
-        var game = SpearGameState(firstTarget: .top)
-        game.beginAim(); game.setAim(angleDegrees: 20); game.release()
-        game.resolveFlight(hit: true)
-        XCTAssertEqual(game.phase, .hit)
-        XCTAssertEqual(game.score, 1)
-
-        game.finishRound(); game.beginAim(); game.setAim(angleDegrees: 70); game.release()
-        game.resolveFlight(hit: false)
-        XCTAssertEqual(game.phase, .miss)
-        XCTAssertEqual(game.score, 1)
+    func testActualShaftSegmentCollisionAndGroundMiss() {
+        let path = BallisticFlightPath(start: PresentationPoint(x: 48, y: 108), angleDegrees: 45, power: 0.5, groundY: 16)
+        let hit = PresentationPoint(x: 280, y: 270)
+        XCTAssertNotNil(SpearCollision.firstImpact(path: path, target: hit, fromElapsed: 0, toElapsed: path.groundCrossing.elapsed))
+        XCTAssertNil(SpearCollision.firstImpact(path: path, target: PresentationPoint(x: 260, y: 700), fromElapsed: 0, toElapsed: path.groundCrossing.elapsed))
     }
 
-    func testReleaseHandMovesContinuouslyWithoutBodyCrossAndFlightStartsAtFinalHand() {
-        let aiming = SpearPresentationGeometry(pose: .aiming, aimDegrees: 45)
-        let release = SpearPresentationGeometry(pose: .release, aimDegrees: 45)
-        XCTAssertEqual(aiming.hand, release.releaseEntryHand)
-        XCTAssertEqual(release.hand(atReleaseProgress: 0), release.releaseEntryHand)
-        XCTAssertEqual(release.hand(atReleaseProgress: 1), release.finalReleaseHand)
-        XCTAssertLessThanOrEqual(release.finalReleaseHand.x, release.shoulder.x)
-        XCTAssertEqual(release.flightStart, release.finalReleaseHand)
+    func testGestureCancelsOutsideAndStaleDownResets() {
+        var gesture = LocalGesture()
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
+        gesture.move(to: PresentationPoint(x: 40, y: 100), isInsideInput: false)
+        XCTAssertNil(gesture.release(isInsideInput: false))
+        XCTAssertTrue(gesture.begin(at: PresentationPoint(x: 48, y: 48), inStartZone: true))
     }
 
-    func testPresentationPoliciesPreserveStandardAndReducedMotionBoundaries() {
-        XCTAssertEqual(PresentationPolicy.standard.launchDuration, 0.16, accuracy: 0.0001)
-        XCTAssertEqual(PresentationPolicy.standard.flightDuration, 0.82, accuracy: 0.0001)
-        XCTAssertTrue(PresentationPolicy.standard.showsFlightTranslation)
-        XCTAssertEqual(PresentationPolicy.reducedMotion.aimingCycle, 0.3, accuracy: 0.0001)
-        XCTAssertFalse(PresentationPolicy.reducedMotion.showsFlightTranslation)
-        XCTAssertEqual(PresentationPolicy.reducedMotion.staticResultDuration, 0.5, accuracy: 0.0001)
-        XCTAssertEqual(FlightLayerContract.visibilityOnly.ignoresMouseEvents, true)
-        XCTAssertEqual(AnchorInteraction.displayOnly.ignoresMouseEvents, true)
-    }
-
-    func testDiscreteBandFreezesAssetTangentAndFinalP0ForBallistics() {
-        XCTAssertEqual(MotionAssetBand.forRawAim(20), .low25)
-        XCTAssertEqual(MotionAssetBand.forRawAim(45), .mid45)
-        XCTAssertEqual(MotionAssetBand.forRawAim(70), .high65)
-        let snapshot = MotionAssetSnapshot.fixture(.mid45)
-        let path = BallisticFlightPath(start: snapshot.flightStart, targetX: 1232, snapshot: snapshot)
-        XCTAssertEqual(path.aimDegrees, 45, accuracy: 0.001)
-        XCTAssertEqual(path.start, snapshot.flightStart)
-        XCTAssertEqual(path.sample(elapsed: 0).shaftAngleDegrees, snapshot.flightAngleDegrees, accuracy: 0.001)
-    }
-
-    func testReleaseSequenceUsesDiscreteAssetFramesAtExactOffsets() {
-        XCTAssertEqual(MotionAssetBand.low25.releaseFrameOffsetsMs, [0, 53, 107, 160])
-        XCTAssertEqual(MotionAssetBand.mid45.releaseFrameOffsetsMs, [0, 53, 107, 160])
-        XCTAssertEqual(MotionAssetBand.high65.releaseFrameOffsetsMs, [0, 53, 107, 160])
-        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 0), 0)
-        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 53), 1)
-        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 107), 2)
-        XCTAssertEqual(MotionAssetBand.mid45.frameIndex(atReleaseElapsedMs: 160), 3)
-    }
-
-    func testFlightClockUsesFirstTickAsBaselineThenMonotonicActualDeltaWithClamp() {
+    func testFlightClockAndDisplayContractsRemainLocalAndNonactivating() {
         var clock = FlightClock(maximumDelta: 0.25)
         XCTAssertEqual(clock.advance(now: 10), 0)
         XCTAssertEqual(clock.advance(now: 10.08), 0.08, accuracy: 0.000_001)
         XCTAssertEqual(clock.advance(now: 11), 0.25, accuracy: 0.000_001)
-        XCTAssertEqual(clock.advance(now: 10.9), 0, accuracy: 0.000_001)
-    }
-
-    func testFlightPanelCoordinatesConvertGlobalScreenPointToContentLocal() {
-        let origin = PresentationPoint(x: -1440, y: 24)
-        XCTAssertEqual(FlightPanelCoordinates.local(PresentationPoint(x: -1300, y: 100), screenOrigin: origin), PresentationPoint(x: 140, y: 76))
-    }
-
-    func testFallbackSnapshotStaysCodeDrawnAndNeverBlank() {
-        let snapshot = MotionAssetSnapshot.fallback(for: .high65)
-        XCTAssertTrue(snapshot.usesCodeFallback)
-        XCTAssertEqual(snapshot.band, .high65)
-        XCTAssertEqual(snapshot.flightStart, snapshot.finalP0)
+        XCTAssertTrue(FlightLayerContract.visibilityOnly.ignoresMouseEvents)
+        XCTAssertFalse(FlightLayerContract.visibilityOnly.canBecomeKey)
+        XCTAssertFalse(FlightLayerContract.visibilityOnly.canBecomeMain)
+        XCTAssertEqual(BallisticFlightPath.shaftLength, 42, accuracy: 0.0001)
     }
 }

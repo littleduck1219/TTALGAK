@@ -1,50 +1,27 @@
-# TTALGAK 창던지기 v2
+# TTALGAK 창던지기 v3
 
-Native macOS 13+ menu-bar mini game. The primary display keeps exactly two transparent `180 × 110 pt` AppKit anchors: left is the only local press/hold/release surface, right is display-only. Windows, Rive, external runtimes, downloads, accounts, and third-party assets are out of scope.
+Native macOS 13+ menu-bar mini game. `I_L` is the only pointer input: a transparent `180 × 110 pt` nonactivating panel. Pointer down must begin in its visible actor/held-spear `44 × 44 pt` local zone. `I_R` remains a transparent `180 × 110 pt` display-only structural panel. The actor, target, ground, result, and flight render on a separate full-primary-display transparent display panel; it ignores mouse events and is never key/main.
 
-## Internal motion assets
+## v3 contract
 
-- `Sources/TTALGAK/Resources/StickmanMotion/source/` tracks Maggie’s 17 original transparent black-only SVG frames and `asset-manifest.json`; `runtime/` contains their tracked `180×110` RGBA PNG frame assets.
-- `Tools/regenerate_motion_pngs.py` reproduces runtime PNGs from the tracked internal transparent contact sheets using installed Python/Pillow. Exact provenance is in `Sources/TTALGAK/Resources/StickmanMotion/PROVENANCE.md`.
-- SwiftPM copies `Resources/StickmanMotion`; `StickmanMotionAssets` validates artboard, ordered release frames, hand/tail/final `ballisticP0`, tangents, and every PNG before use. Missing/bad assets select the explicit code-drawn fallback; the actor is never blank.
-- Ready and Aim use a discrete selected band: raw `20…35→low25`, `>35…55→mid45`, `>55…70→high65`. No continuous asset interpolation is claimed. Release freezes the selected band/manifest snapshot and Core Animation switches `entry → 053 → 107 → 160` over 160ms.
-- On the next compositor boundary, the held preview is hidden with `recovery.png` and exactly one code-flight spear starts at the selected manifest final `P0`; SVG y-down tangent becomes y-up velocity tangent. The ballistic path consumes this frozen snapshot, not the old code hand geometry.
+- Local vertical drag maps exactly to `angle=clamp(45 + 20×dy/48, 25, 65)` in y-up points. Reverse tangent projection maps power with a 6pt dead zone and 72pt maximum: `r=max(0,-dot(D,t))`, `power=clamp((r-6)/66,0,1)`.
+- Down/move/up are local NSView events only. Leaving `I_L` cancels; the next local down resets stale aim. There are no event monitors, taps, global pointer/key/cursor APIs, capture, network, clipboard, or permission APIs.
+- Pure launch input is frozen `(P0, angle, power, groundY)`. `g=2400 pt/s²`, `v0=900+1000×power`, `L=42`; target seed/result never participate in velocity or trajectory calculation.
+- Hit is only physical `R=16` shaft-segment/ring collision. Miss is the first physical ground-plane crossing, or an honest off-display miss. No target steering, canonical target calibration, endpoint blend, prediction arc, numeric gauge, card, or angle label exists.
+- Standard mode uses common-run-loop monotonic elapsed time and ≤4pt collision substeps. Reduced Motion evaluates the same frozen physics immediately, shows a static truthful result, and creates no flight trajectory layer.
 
-## Ballistic and lifecycle contract
+Existing internal PNG/SVG assets are not v3 final character-quality acceptance; the code-drawn actor is an intentionally safe fallback.
 
-- Black-only `#000000`, transparent/no-box scene, 48pt inward subject/target placement, existing 3–3.5pt rounded strokes, app-owned bottom inset, nonactivating/non-key/non-main panels, no permissions/capture/network/file/clipboard/global monitor remain unchanged.
-- `BallisticFlightPath` is y-up and freezes selected asset `P0`, tangent-derived `θ`, and target X. `g=2400pt/s²`; `h25=-.022`, `h45=0`, `h65=.022`; angle-only piecewise `k(θ)` uses canonical `k25/k45/k65` values. `vx=k√(gdx)`, `vy=vx tanθ`, `Tphysics=dx/vx`.
-- Standard flight is exactly 820ms without easing: `q=elapsed/.820`, `τ=qTphysics`, `x=x0+vxτ`, `y=y0+vyτ-.5gτ²`, velocity `(vx, vy-gτ)`. The 42pt shaft tail is `(x,y)` and tip is velocity-normalized. No cubic/quadratic/sine path, endpoint forcing, endpoint approach, target/result trajectory input, or velocity smoothing exists.
-- Ready setup uses the canonical asset snapshot for ballistic target placement. Every score/cue is sampled actual shaft segment-circle collision against the visible `R=16pt` ring, with maximum 4pt tip substeps. Miss X is at the actual final tip.
-- Accepted M-01/M-02 contract: remove the visibility-only FlightPanel at impact; TargetView retains Hit/Miss. Recovery asset remains through impact/result hold, then the existing 220ms reset phase ends in discrete Ready (no unclaimed tween/fade).
-- Reduced Motion has no FlightPanel, Core Animation pose tween, ballistic translation/rotation, scale, body shift, or fade; it retains the 300ms discrete aim / 500ms static result policy.
-
-## Mac commands and required QA
+## Linux static validation
 
 ```bash
-cd /Users/littleduck/Documents/GitHub/TTALGAK
-git pull --ff-only origin main
-swift package describe
-swift test
-swift build
-swift run TTALGAK
-```
-
-Record PASS/FAIL and observations for asset loading/fallback, low/mid/high discrete band and release frames, final P0/tangent launch continuity, ballistic apex/descent/actual collision, recovery→Ready timing, underlying button/text/drag pass-through and focus, right/flight non-key behavior, black/no-box/180×110 bounds, Reduced Motion, and no Screen Recording/Accessibility/Input Monitoring prompt. For the mandatory mid-band throw, once code-flight starts the spear must visibly advance, impact, or miss within 1 second; it must never remain fixed with no target cue. Linux static validation below is not macOS/AppKit runtime proof.
-
-```bash
-python3 Tools/regenerate_motion_pngs.py
 python3 Tests/verify_project.py
 python3 -m py_compile Tests/verify_project.py Tools/regenerate_motion_pngs.py
 ```
 
-## AppKit compile recovery
+Linux has no Swift toolchain in this environment, so these checks do not claim Swift/AppKit compilation or runtime success.
 
-`NSView` has no `convertToScreen`. Asset and code-drawn fallback points now use the public chain `view local → view.convert(_:to:nil) window coordinates → owning NSWindow.convertToScreen(_:)`; an unattached fallback remains local only because it has no screen coordinate. FlightPanel converts its content origin through `panel.convertToScreen(_:)`, whose meaning is the panel content origin in screen coordinates—not a guessed panel frame. Release images bind `assets` optionally, then build `[NSImage]` with `compactMap` and verify its count.
-
-The Linux static guard rejects unqualified or `NSView`-identifier `convertToScreen` calls and optional-binding a `compactMap` array while preserving valid `NSWindow`/`NSPanel` conversion calls. It does not compile AppKit.
-
-Representative Mac acceptance (required before motion QA):
+## Mandatory Mac QA handoff
 
 ```bash
 cd /Users/littleduck/Documents/GitHub/TTALGAK
@@ -55,4 +32,4 @@ swift build
 swift run TTALGAK
 ```
 
-Proceed to motion QA only if `swift build` exits 0. Return the command output and exit status; Linux static validation is not a substitute.
+Run the M-V3 matrix after the four commands pass: same 45° short/mid/long reverse pulls must have strictly rising landing distance; 25°/45°/65° at equal power must differ; actual ground misses, non-clipping actor/target, focus/pass-through/non-key behavior, reduced-motion truth, timer cleanup, and zero permission prompts must be recorded PASS/FAIL. v3 is a candidate implementation until real Mac QA passes.

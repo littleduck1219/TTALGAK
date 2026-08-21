@@ -4,113 +4,59 @@ import SpearGameCore
 private let ink = NSColor.black
 
 final class SpearThrowView: NSView {
-    enum Event { case press, release }
-    var state = SpearGameState() { didSet { needsDisplay = true } }
-    var pose = StickmanPose.ready { didSet { updateAssetFrame(); needsDisplay = true } }
-    var aimDegrees = 45.0 { didSet { updateAssetFrame(); needsDisplay = true } }
-    var releaseProgress = 1.0 { didSet { updateAssetFrame(); needsDisplay = true } }
+    enum Event { case down(PresentationPoint), move(PresentationPoint, Bool), up(Bool) }
     private let onEvent: (Event) -> Void
-    private let assets = StickmanMotionAssets()
-    private let assetLayer = CALayer()
-    private var usesAssetFrame = false
-
-    init(frame: NSRect, onEvent: @escaping (Event) -> Void) {
-        self.onEvent = onEvent
-        super.init(frame: frame)
-        wantsLayer = true
-        assetLayer.contentsGravity = .resize
-        layer?.addSublayer(assetLayer)
-        updateAssetFrame()
-    }
+    init(frame: NSRect, onEvent: @escaping (Event) -> Void) { self.onEvent = onEvent; super.init(frame: frame); wantsLayer = true }
     required init?(coder: NSCoder) { nil }
-    override func layout() { super.layout(); assetLayer.frame = bounds; assetLayer.contentsScale = window?.backingScaleFactor ?? 1 }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) { onEvent(.press) }
-    override func mouseUp(with event: NSEvent) { onEvent(.release) }
-    override func draw(_ dirtyRect: NSRect) { if !usesAssetFrame { drawStickman(geometry: geometry) } }
-    var geometry: SpearPresentationGeometry { SpearPresentationGeometry(pose: pose, aimDegrees: aimDegrees) }
-    var selectedBand: MotionAssetBand { MotionAssetBand.forRawAim(aimDegrees) }
-    func assetSnapshot() -> MotionAssetSnapshot { assetSnapshot(for: selectedBand) }
-    func assetSnapshot(for band: MotionAssetBand) -> MotionAssetSnapshot {
-        if let snapshot = assets?.snapshot(for: band, in: self) { return snapshot }
-        let fallback = MotionAssetSnapshot.fallback(for: band)
-        let local = NSPoint(x: fallback.finalP0.x, y: 110 - fallback.finalP0.y)
-        // An unattached view has no screen coordinate; retain the explicit local fallback for that non-visible state.
-        guard let window else { return fallback }
-        let windowPoint = convert(NSRect(origin: local, size: .zero), to: nil).origin
-        let screen = window.convertToScreen(NSRect(origin: windowPoint, size: .zero)).origin
-        return fallback.withFlightStart(PresentationPoint(x: screen.x, y: screen.y))
-    }
-
-    /// Core Animation switches only the selected discrete source frames: entry → 053 → 107 → 160 over 160ms.
-    func playReleaseFrames() {
-        guard let assets else { return }
-        let images: [NSImage] = selectedBand.releaseFiles.compactMap { assets.image(named: $0) }
-        guard images.count == 4 else { return }
-        let cgImages = images.compactMap { $0.cgImage(forProposedRect: nil, context: nil, hints: nil) }
-        guard cgImages.count == 4 else { return }
-        assetLayer.contents = cgImages[3]
-        let animation = CAKeyframeAnimation(keyPath: "contents")
-        animation.values = cgImages
-        animation.keyTimes = [0, 0.33125, 0.66875, 1]
-        animation.duration = 0.160
-        animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        assetLayer.add(animation, forKey: "ttalgak.release.frames")
-        usesAssetFrame = true
-    }
-
-    private func updateAssetFrame() {
-        guard let assets else { showFallback(); return }
-        let name: String
-        switch pose {
-        case .ready: name = "ready.png"
-        case .aiming: name = selectedBand.aimFile
-        case .release:
-            let milliseconds = Int((min(max(releaseProgress, 0), 1) * 160).rounded())
-            name = selectedBand.releaseFiles[selectedBand.frameIndex(atReleaseElapsedMs: milliseconds)]
-        case .flying, .recovery: name = "recovery.png" // held preview is hidden before the code-flight boundary.
-        }
-        guard let image = assets.image(named: name), let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { showFallback(); return }
-        assetLayer.removeAnimation(forKey: "ttalgak.release.frames")
-        assetLayer.contents = cgImage
-        usesAssetFrame = true
-        needsDisplay = true
-    }
-
-    private func showFallback() { assetLayer.removeAllAnimations(); assetLayer.contents = nil; usesAssetFrame = false; needsDisplay = true }
-
-    private func drawStickman(geometry: SpearPresentationGeometry) {
-        let origin = NSPoint(x: 48, y: 33); let pose = geometry.pose; ink.setStroke()
-        let head = NSBezierPath(ovalIn: NSRect(x: origin.x - 6, y: origin.y + 30, width: 12, height: 12)); head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke()
-        let lean: CGFloat = pose == .aiming ? -3 : pose == .release ? 4 : 0
-        let body = NSBezierPath(); body.move(to: NSPoint(x: origin.x, y: origin.y + 30)); body.line(to: NSPoint(x: origin.x + lean, y: origin.y + 10)); body.move(to: NSPoint(x: origin.x + lean, y: origin.y + 10)); body.line(to: NSPoint(x: origin.x - 9, y: origin.y)); body.move(to: NSPoint(x: origin.x + lean, y: origin.y + 10)); body.line(to: NSPoint(x: origin.x + 9, y: origin.y))
-        let handPoint = pose == .release ? geometry.hand(atReleaseProgress: releaseProgress) : geometry.hand
-        let shoulder = NSPoint(x: CGFloat(geometry.shoulder.x), y: CGFloat(geometry.shoulder.y)); let hand = NSPoint(x: CGFloat(handPoint.x), y: CGFloat(handPoint.y))
-        body.move(to: shoulder); body.line(to: hand); body.lineWidth = 3; body.lineCapStyle = .round; body.lineJoinStyle = .round; body.stroke()
-        guard pose == .ready || pose == .aiming || pose == .release else { return }
-        let radians = CGFloat(geometry.aimDegrees * .pi / 180)
-        drawHeldSpear(from: hand, to: NSPoint(x: hand.x + cos(radians) * 42, y: hand.y + sin(radians) * 42))
-    }
-    private func drawHeldSpear(from start: NSPoint, to end: NSPoint) {
-        ink.setStroke(); let spear = NSBezierPath(); spear.move(to: start); spear.line(to: end); spear.lineWidth = 3; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke()
-        let tip = NSBezierPath(); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 5, y: end.y - 3)); tip.move(to: end); tip.line(to: NSPoint(x: end.x - 4, y: end.y + 4)); tip.lineWidth = 2.5; tip.lineCapStyle = .round; tip.lineJoinStyle = .round; tip.stroke()
-    }
+    private func point(_ event: NSEvent) -> PresentationPoint { let p = convert(event.locationInWindow, from: nil); return PresentationPoint(x: Double(p.x), y: Double(p.y)) }
+    private var actorStartZone: NSRect { NSRect(x: 26, y: 24, width: 44, height: 44) }
+    override func mouseDown(with event: NSEvent) { let p = point(event); guard actorStartZone.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))) else { return }; onEvent(.down(p)) }
+    override func mouseDragged(with event: NSEvent) { let p = point(event); onEvent(.move(p, bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
+    override func mouseUp(with event: NSEvent) { let p = point(event); onEvent(.up(bounds.contains(NSPoint(x: CGFloat(p.x), y: CGFloat(p.y))))) }
 }
 
-final class TargetView: NSView {
-    var state = SpearGameState() { didSet { needsDisplay = true } }
-    var targetPoint = NSPoint(x: 132, y: 55) { didSet { needsDisplay = true } }
-    var finalTip = NSPoint.zero { didSet { needsDisplay = true } }
-    override func draw(_ dirtyRect: NSRect) { drawTarget(at: targetPoint); if state.phase == .hit { drawCheck(at: targetPoint) }; if state.phase == .miss { drawMiss(at: finalTip) } }
-    private func drawTarget(at point: NSPoint) { ink.setStroke(); for radius: CGFloat in [16, 10] { let circle = NSBezierPath(ovalIn: NSRect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)); circle.lineWidth = 3.5; circle.lineCapStyle = .round; circle.lineJoinStyle = .round; circle.stroke() }; ink.setFill(); NSBezierPath(ovalIn: NSRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)).fill() }
-    private func drawCheck(at point: NSPoint) { ink.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x + 16, y: point.y - 4)); mark.line(to: NSPoint(x: point.x + 21, y: point.y - 9)); mark.line(to: NSPoint(x: point.x + 30, y: point.y + 6)); mark.lineWidth = 3.5; mark.lineCapStyle = .round; mark.lineJoinStyle = .round; mark.stroke(); NSAttributedString(string: "+1", attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .bold), .foregroundColor: ink]).draw(at: NSPoint(x: point.x - 7, y: point.y + 22)) }
-    private func drawMiss(at point: NSPoint) { ink.setStroke(); let mark = NSBezierPath(); mark.move(to: NSPoint(x: point.x - 5, y: point.y - 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y + 5)); mark.move(to: NSPoint(x: point.x - 5, y: point.y + 5)); mark.line(to: NSPoint(x: point.x + 5, y: point.y - 5)); mark.lineWidth = 3.5; mark.lineCapStyle = .round; mark.lineJoinStyle = .round; mark.stroke() }
+final class SceneView: NSView {
+    var inputFrame = NSRect.zero { didSet { needsDisplay = true } }
+    var target = PresentationPoint(x: 0, y: 0) { didSet { needsDisplay = true } }
+    var groundY: CGFloat = 0 { didSet { needsDisplay = true } }
+    var aiming: FrozenLaunch? { didSet { needsDisplay = true } }
+    var result: (hit: Bool, point: PresentationPoint)? { didSet { needsDisplay = true } }
+    var screenOrigin = PresentationPoint(x: 0, y: 0)
+    private func local(_ p: PresentationPoint) -> NSPoint { NSPoint(x: CGFloat(p.x - screenOrigin.x), y: CGFloat(p.y - screenOrigin.y)) }
+    override func draw(_ dirtyRect: NSRect) {
+        ink.setStroke()
+        let localGround = groundY - CGFloat(screenOrigin.y)
+        let ground = NSBezierPath(); ground.move(to: NSPoint(x: 0, y: localGround)); ground.line(to: NSPoint(x: bounds.width, y: localGround)); ground.lineWidth = 1.5; ground.stroke()
+        let feet = NSPoint(x: inputFrame.minX + 48 - CGFloat(screenOrigin.x), y: localGround)
+        drawActor(feet: feet)
+        let center = local(target); for radius: CGFloat in [22, 10] { let ring = NSBezierPath(ovalIn: NSRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)); ring.lineWidth = 3.5; ring.stroke() }
+        if let aiming { drawHeld(from: NSPoint(x: feet.x + 18, y: feet.y + 42), launch: aiming) }
+        if let result { drawResult(result) }
+    }
+    private func drawActor(feet: NSPoint) {
+        let head = NSBezierPath(ovalIn: NSRect(x: feet.x + 12, y: feet.y + 58, width: 12, height: 12)); head.lineWidth = 3; head.stroke()
+        let body = NSBezierPath(); body.move(to: NSPoint(x: feet.x + 18, y: feet.y + 58)); body.line(to: NSPoint(x: feet.x + 18, y: feet.y + 22)); body.line(to: NSPoint(x: feet.x + 8, y: feet.y)); body.move(to: NSPoint(x: feet.x + 18, y: feet.y + 22)); body.line(to: NSPoint(x: feet.x + 28, y: feet.y)); body.lineWidth = 3; body.lineCapStyle = .round; body.stroke()
+    }
+    private func drawHeld(from hand: NSPoint, launch: FrozenLaunch) {
+        let t = DragLaunch.tangent(angleDegrees: launch.angleDegrees)
+        let end = NSPoint(x: hand.x + CGFloat(t.x * 42), y: hand.y + CGFloat(t.y * 42))
+        let arm = NSBezierPath(); arm.move(to: NSPoint(x: hand.x - 8, y: hand.y + 2)); arm.line(to: hand); arm.lineWidth = 3; arm.stroke()
+        let spear = NSBezierPath(); spear.move(to: hand); spear.line(to: end); spear.lineWidth = 3; spear.lineCapStyle = .round; spear.stroke()
+        guard launch.power > 0 else { return }
+        let length = 6 + 24 * launch.power; let tension = NSBezierPath(); tension.move(to: hand); tension.line(to: NSPoint(x: hand.x - CGFloat(t.x * length), y: hand.y - CGFloat(t.y * length))); tension.lineWidth = 2; tension.lineCapStyle = .round; tension.stroke()
+    }
+    private func drawResult(_ result: (hit: Bool, point: PresentationPoint)) {
+        let p = local(result.point); let mark = NSBezierPath()
+        if result.hit { mark.appendArc(withCenter: p, radius: 28, startAngle: 0, endAngle: 360, clockwise: false) } else { mark.move(to: NSPoint(x: p.x - 6, y: p.y - 6)); mark.line(to: NSPoint(x: p.x + 6, y: p.y + 6)); mark.move(to: NSPoint(x: p.x - 6, y: p.y + 6)); mark.line(to: NSPoint(x: p.x + 6, y: p.y - 6)) }
+        mark.lineWidth = 2.5; mark.stroke()
+    }
 }
 
 final class FlightView: NSView {
     var path: BallisticFlightPath? { didSet { needsDisplay = true } }
     var elapsed = 0.0 { didSet { needsDisplay = true } }
     var screenOrigin = PresentationPoint(x: 0, y: 0)
-    override func draw(_ dirtyRect: NSRect) { guard let path else { return }; let sample = path.sample(elapsed: elapsed); let tail = FlightPanelCoordinates.local(sample.tail, screenOrigin: screenOrigin); let tip = FlightPanelCoordinates.local(sample.tip, screenOrigin: screenOrigin); drawSpear(tail: NSPoint(x: CGFloat(tail.x), y: CGFloat(tail.y)), tip: NSPoint(x: CGFloat(tip.x), y: CGFloat(tip.y))) }
-    private func drawSpear(tail: NSPoint, tip: NSPoint) { ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.lineJoinStyle = .round; spear.stroke(); let head = NSBezierPath(); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 6, y: tip.y - 3)); head.move(to: tip); head.line(to: NSPoint(x: tip.x - 5, y: tip.y + 4)); head.lineWidth = 3; head.lineCapStyle = .round; head.lineJoinStyle = .round; head.stroke() }
+    override func draw(_ dirtyRect: NSRect) { guard let path else { return }; let sample = path.sample(elapsed: elapsed); drawSpear(tail: NSPoint(x: CGFloat(sample.tail.x - screenOrigin.x), y: CGFloat(sample.tail.y - screenOrigin.y)), tip: NSPoint(x: CGFloat(sample.tip.x - screenOrigin.x), y: CGFloat(sample.tip.y - screenOrigin.y))) }
+    private func drawSpear(tail: NSPoint, tip: NSPoint) { ink.setStroke(); let spear = NSBezierPath(); spear.move(to: tail); spear.line(to: tip); spear.lineWidth = 3.5; spear.lineCapStyle = .round; spear.stroke() }
 }

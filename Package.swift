@@ -8,6 +8,6 @@ let package = Package(
     targets: [
         .target(name: "SpearGameCore"),
         .executableTarget(name: "TTALGAK", dependencies: ["SpearGameCore"], resources: [.copy("Resources/StickmanMotion")]),
-        .testTarget(name: "SpearGameCoreTests", dependencies: ["SpearGameCore"], path: "Tests")
+        .testTarget(name: "SpearGameCoreTests", dependencies: ["SpearGameCore"], path: "Tests", exclude: ["verify_project.py"])
     ]
 )
