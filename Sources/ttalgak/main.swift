@@ -1,0 +1,199 @@
+import AppKit
+import SpriteKit
+
+if CommandLine.arguments.contains("--selftest") {
+    runSelfTest()
+    exit(0)
+}
+
+// 밸런스 자동 테스트: --simulate [maxWave] — 봇이 정확도별로 플레이해 난이도 곡선 출력
+if let idx = CommandLine.arguments.firstIndex(of: "--simulate") {
+    let maxWave = CommandLine.arguments.count > idx + 1 ? Int(CommandLine.arguments[idx + 1]) ?? 30 : 30
+    print("=== ttalgak 밸런스 시뮬레이션 (최대 \(maxWave)웨이브, 60fps 수동 스텝) ===")
+    for acc in [CGFloat(0.95), 0.8, 0.6] {
+        for run in 1 ... 3 {
+            let view = SKView(frame: NSRect(x: 0, y: 0, width: Tuning.sceneW, height: Tuning.sceneH))
+            let scene = GameScene(size: CGSize(width: Tuning.sceneW, height: Tuning.sceneH))
+            scene.scaleMode = .resizeFill
+            view.presentScene(scene)
+            var frame = 0
+            var lastWave = 1
+            var minHP = Tuning.playerMaxHP
+            var waveLog: [String] = []
+            var result = "생존"
+            while frame < 60 * 60 * 30 {   // 상한 30분
+                scene.update(Double(frame) / 60)
+                let st = scene.simState
+                minHP = min(minHP, st.hp)
+                if st.over {
+                    result = "사망 @웨이브 \(st.wave) (\(frame / 60)초)"
+                    break
+                }
+                if st.wave > maxWave { break }
+                if st.wave != lastWave {
+                    waveLog.append("w\(lastWave):hp\(Int(st.hp))")
+                    lastWave = st.wave
+                }
+                if st.choosing {
+                    scene.simChooseBest()
+                } else if let aim = scene.simAimPoint(accuracy: acc) {
+                    scene.requestThrow(at: aim)
+                }
+                frame += 1
+            }
+            print("acc \(acc) run\(run): \(result), 최저HP \(Int(minHP)) | \(waveLog.suffix(12).joined(separator: " "))")
+        }
+    }
+    exit(0)
+}
+
+// 오프스크린 렌더 검증용: --snapshot <outDir> — 프레임 몇 개를 PNG로 저장
+if let idx = CommandLine.arguments.firstIndex(of: "--snapshot") {
+    let outDir = CommandLine.arguments.count > idx + 1 ? CommandLine.arguments[idx + 1] : "."
+    let size = CGSize(width: Tuning.sceneW, height: Tuning.sceneH)
+    let view = SKView(frame: NSRect(origin: .zero, size: size))
+    let scene = GameScene(size: size)
+    scene.scaleMode = .resizeFill
+    view.presentScene(scene)
+    scene.backgroundColor = SKColor(white: 0.85, alpha: 1)   // 기본 검정 테마가 보이도록 밝은 배경
+
+    func save(_ name: String) {
+        if let tex = view.texture(from: scene) {
+            let rep = NSBitmapImageRep(cgImage: tex.cgImage())
+            try! rep.representation(using: .png, properties: [:])!
+                .write(to: URL(fileURLWithPath: "\(outDir)/\(name).png"))
+        }
+    }
+
+    // 크리처 라인업 검증 샷 (하급 3 + 정예 3)
+    let lineup: [any CreatureFigure] = EnemyKind.allCases.map { $0.makeFigure(color: .black) }
+    for (i, f) in lineup.enumerated() {
+        f.position = CGPoint(x: 210 + CGFloat(i) * 125, y: 26)
+        f.animate(phase: 1.2)
+        scene.addChild(f)
+    }
+    save("kinds")
+    // 공격 포즈 샷
+    lineup.forEach { $0.attack(1.0) }
+    save("kinds_attack")
+    lineup.forEach { $0.removeFromParent() }
+
+    // 등급 카드 UI 검증 샷
+    scene.debugShowUpgradeCards()
+    save("cards")
+    scene.restart()
+
+    var shot = 0
+    for frame in 0 ..< (60 * 6) {
+        scene.update(Double(frame) / 60)
+        if frame == 40 || frame == 170 { scene.requestThrow(at: CGPoint(x: 780, y: 70)) }
+        if [58, 70, 90, 200, 300].contains(frame) {
+            save("snap\(shot)_f\(frame)")
+            shot += 1
+        }
+    }
+    print("snapshots: \(shot + 2)")
+    exit(0)
+}
+
+final class GameWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var window: GameWindow!
+    var scene: GameScene!
+    var skView: SKView!
+    var statusItem: NSStatusItem!
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let screen = NSScreen.main!.visibleFrame   // 독/메뉴바 제외 영역
+        let size = NSSize(width: Tuning.sceneW, height: Tuning.sceneH)
+        let origin = NSPoint(x: screen.midX - size.width / 2, y: screen.minY + Tuning.dockGap)
+
+        window = GameWindow(contentRect: NSRect(origin: origin, size: size),
+                            styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+        window.level = .floating
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.ignoresMouseEvents = false   // 클릭 = 조준 투척이므로 게임 밴드는 클릭을 받는다
+
+        skView = SKView(frame: NSRect(origin: .zero, size: size))
+        skView.allowsTransparency = true
+        skView.ignoresSiblingOrder = true
+        scene = GameScene(size: CGSize(width: size.width, height: size.height))
+        scene.scaleMode = .resizeFill
+        scene.onInteractive = { [weak self] interactive in
+            if interactive { self?.window.makeKeyAndOrderFront(nil) }
+        }
+        window.contentView = skView
+        skView.presentScene(scene)
+        window.orderFrontRegardless()
+
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.title = "🎯"
+        let menu = NSMenu()
+        let flip = NSMenuItem(title: "좌우 반전", action: #selector(flipSides), keyEquivalent: "")
+        flip.target = self
+        flip.state = UserDefaults.standard.bool(forKey: "mirrored") ? .on : .off
+        menu.addItem(flip)
+        let theme = NSMenuItem(title: "흰색 테마", action: #selector(toggleTheme), keyEquivalent: "")
+        theme.target = self
+        theme.state = UserDefaults.standard.bool(forKey: "whiteTheme") ? .on : .off
+        menu.addItem(theme)
+        let restart = NSMenuItem(title: "다시 시작", action: #selector(restartGame), keyEquivalent: "")
+        restart.target = self
+        menu.addItem(restart)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "종료", action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+        statusItem.menu = menu
+
+        // 화면 잠금/해제: 잠금 중 일시정지, 해제 시 죽은 Metal 레이어(회색 박스) 복구
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(self, selector: #selector(screenLocked),
+                        name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        dnc.addObserver(self, selector: #selector(screenUnlocked),
+                        name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(screenUnlocked),
+            name: NSWorkspace.screensDidWakeNotification, object: nil)
+    }
+
+    @objc func screenLocked() {
+        skView.isPaused = true
+    }
+
+    @objc func screenUnlocked() {
+        // 씬을 떼었다 재부착해 SKView의 렌더 레이어를 강제 재생성
+        skView.isPaused = false
+        skView.presentScene(nil)
+        skView.allowsTransparency = true
+        skView.presentScene(scene)
+        window.orderFrontRegardless()
+    }
+
+    @objc func flipSides(_ sender: NSMenuItem) {
+        let flag = !UserDefaults.standard.bool(forKey: "mirrored")
+        scene.setMirrored(flag)
+        sender.state = flag ? .on : .off
+    }
+
+    @objc func toggleTheme(_ sender: NSMenuItem) {
+        let white = !UserDefaults.standard.bool(forKey: "whiteTheme")
+        scene.setTheme(white: white)
+        sender.state = white ? .on : .off
+    }
+
+    @objc func restartGame() { scene.restart() }
+    @objc func quitApp() { NSApp.terminate(nil) }
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)   // 독 아이콘 없음, 상태바 메뉴만
+app.run()

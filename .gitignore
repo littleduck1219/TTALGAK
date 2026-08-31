@@ -1,0 +1,7 @@
+.build/
+.DS_Store
+# 개인 AI OS 위키 포인터 (로컬 전용)
+CLAUDE.md
+CODEX.md
+GEMINI.md
+.ai-os/
