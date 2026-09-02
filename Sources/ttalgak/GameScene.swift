@@ -52,6 +52,7 @@ final class Enemy: SKNode {
     var walkPhase: CGFloat = .random(in: 0 ..< (2 * .pi))
     var chillTimer: TimeInterval = 0
     var blinkTimer: TimeInterval = .random(in: 1.5 ... 2.5)   // 리퍼 순간이동 주기
+    var inMelee = false   // 근접 공격 중 (와이번은 급강하로 낮아지므로 명중 하한 해제)
     var dying = false
 
     init(kind: EnemyKind, hp: CGFloat, speed: CGFloat, damage: CGFloat) {
@@ -74,6 +75,7 @@ final class Enemy: SKNode {
         let facing: CGFloat = playerX >= position.x ? 1 : -1
         fig.xScale = facing
         chillTimer = max(0, chillTimer - dt)
+        inMelee = inRange
         if inRange {
             // 공격 주기 시작 직후 0.3초 동안 스윙
             let t = CGFloat(min(1, (Tuning.enemyAttackInterval - attackTimer) / 0.3))
@@ -403,7 +405,7 @@ final class GameScene: SKScene {
             for e in enemies where !e.dying && !s.hitSet.contains(ObjectIdentifier(e)) {
                 if abs(tip.x - e.position.x) < e.hitHalfW,
                    tip.y < e.position.y + e.hitH,
-                   tip.y >= e.position.y + e.kind.hitYMin {   // 와이번: 낮은 창은 밑으로 통과
+                   tip.y >= e.position.y + (e.inMelee ? 0 : e.kind.hitYMin) {   // 와이번: 비행 중엔 낮은 창이 밑으로 통과, 근접 급강하 중엔 전신 판정
                     s.hitSet.insert(ObjectIdentifier(e))
                     spearHit(s, e)
                     s.pierce -= 1
