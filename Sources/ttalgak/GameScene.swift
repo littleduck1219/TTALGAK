@@ -278,7 +278,7 @@ final class GameScene: SKScene {
         eliteAt = [:]
         if wave >= 6 {
             let unlocked = EnemyKind.allCases.filter { $0.isElite && wave >= $0.unlockWave }
-            let count = min(5, 1 + (wave - 6) / 4)   // w6:1, w10:2, w14:3, w18:4, w22+:5
+            let count = min(4, 1 + (wave - 6) / 5)   // w6:1, w11:2, w16:3, w21+:4
             var slots = Array(1 ..< toSpawn).shuffled()
             for _ in 0 ..< count {
                 if let kind = unlocked.randomElement(), let slot = slots.popLast() {
@@ -392,7 +392,7 @@ final class GameScene: SKScene {
                     spawnEnemy(.runner, offset: 26)
                     toSpawn -= 1
                 }
-                let maxGap = max(0.5, Tuning.spawnIntervalMax - 0.05 * Double(wave - 1))
+                let maxGap = max(0.6, Tuning.spawnIntervalMax - 0.03 * Double(wave - 1))
                 spawnTimer = .random(in: Tuning.spawnIntervalMin ... maxGap)
             }
         }
@@ -745,6 +745,7 @@ final class GameScene: SKScene {
         let pick = pendingUpgrades[i]
         stats.apply(pick)
         if pick.tier == .unique { uniquesTaken.insert(pick.id) }   // 유니크는 1회 한정
+        stats.hp = min(stats.maxHP, stats.hp + Tuning.waveClearHeal)   // 클리어 보상 회복
         hpBar.xScale = max(0, stats.hp / stats.maxHP)   // heal/toughen 반영
         overlay?.removeFromParent(); overlay = nil
         state = .playing

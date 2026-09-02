@@ -22,11 +22,11 @@ enum Tuning {
     // 적 — 체력은 선형×지수 복합 성장: 플레이어 화력(카드 중첩=지수)과 경쟁하도록
     static let enemyBaseHP: CGFloat = 10
     static let enemyHPGrowth: CGFloat = 0.22      // 선형항: 웨이브당 +22%
-    static let enemyHPExpo: CGFloat = 1.07        // 지수항: 웨이브당 ×1.07 (후반 압박 담당)
+    static let enemyHPExpo: CGFloat = 1.05        // 지수항: 웨이브당 ×1.05 (후반 압박 담당)
     static let enemySpeed: CGFloat = 55
     static let enemySpeedGrowth: CGFloat = 0.04
     static let enemyDamage: CGFloat = 8
-    static let enemyDmgGrowth: CGFloat = 0.05     // 접촉 데미지도 성장 — 후반 누수가 아프도록
+    static let enemyDmgGrowth: CGFloat = 0.03     // 접촉 데미지도 성장 — 후반 누수가 아프도록
     static let enemyAttackInterval: TimeInterval = 1.0
     static let waveBaseCount = 4
     static let waveCountGrowth = 2                // 웨이브당 +2마리
@@ -35,6 +35,9 @@ enum Tuning {
 
     // 콤보
     static let comboWindow: TimeInterval = 3.0
+
+    // 웨이브 클리어 보상: 소량 회복 — 누수 한 번이 사망 나선이 되지 않게
+    static let waveClearHeal: CGFloat = 12
 
     // 던지기 모션 키포즈 타이밍(초) — 모션 튜닝은 여기
     static let windupDur: TimeInterval = 0.28
