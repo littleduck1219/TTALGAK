@@ -8,27 +8,51 @@ final class Spear: SKNode {
     var damage: CGFloat = 0
     var isPower = false
     var landed = false
+    var trailTick = 0
     var hitSet = Set<ObjectIdentifier>()
 
-    init(color: SKColor) {
+    init(color: SKColor, power: Bool = false) {
         super.init()
+        isPower = power
         let len = Tuning.spearLen
         let shaft = CGMutablePath()
         shaft.move(to: CGPoint(x: -len / 2, y: 0))
         shaft.addLine(to: CGPoint(x: len / 2 - 7, y: 0))
         let s = SKShapeNode(path: shaft)
         s.strokeColor = color
-        s.lineWidth = 2.5
+        s.lineWidth = power ? 4.5 : 2.5
         s.lineCap = .round
         addChild(s)
-        let tipPath = CGMutablePath()
-        tipPath.move(to: CGPoint(x: len / 2, y: 0))
-        tipPath.addLine(to: CGPoint(x: len / 2 - 9, y: 3.2))
-        tipPath.addLine(to: CGPoint(x: len / 2 - 9, y: -3.2))
-        tipPath.closeSubpath()
-        let tip = SKShapeNode(path: tipPath)
+        let tip = SKShapeNode()
+        if power {
+            // 파워샷: 다이아 촉 + 크로스가드 + 꼬리 깃털 — 실루엣부터 다르게
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: len / 2 + 4, y: 0))
+            p.addLine(to: CGPoint(x: len / 2 - 8, y: 5.5))
+            p.addLine(to: CGPoint(x: len / 2 - 16, y: 0))
+            p.addLine(to: CGPoint(x: len / 2 - 8, y: -5.5))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: len / 2 - 18, y: 6))       // 크로스가드
+            p.addLine(to: CGPoint(x: len / 2 - 18, y: -6))
+            for dy in [CGFloat(1), -1] {                     // 꼬리 깃털
+                p.move(to: CGPoint(x: -len / 2, y: 0))
+                p.addLine(to: CGPoint(x: -len / 2 - 9, y: 6 * dy))
+                p.move(to: CGPoint(x: -len / 2 + 8, y: 0))
+                p.addLine(to: CGPoint(x: -len / 2 - 1, y: 6 * dy))
+            }
+            tip.path = p
+            tip.lineWidth = 2
+        } else {
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: len / 2, y: 0))
+            p.addLine(to: CGPoint(x: len / 2 - 9, y: 3.2))
+            p.addLine(to: CGPoint(x: len / 2 - 9, y: -3.2))
+            p.closeSubpath()
+            tip.path = p
+        }
         tip.fillColor = color
         tip.strokeColor = color
+        tip.lineJoin = .round
         addChild(tip)
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -54,6 +78,20 @@ final class Enemy: SKNode {
     var blinkTimer: TimeInterval = .random(in: 1.5 ... 2.5)   // 리퍼 순간이동 주기
     var inMelee = false   // 근접 공격 중 (와이번은 급강하로 낮아지므로 명중 하한 해제)
     var dying = false
+    private let chillMark: SKShapeNode = {   // 슬로우 표시: 머리 위 눈꽃(*)
+        let p = CGMutablePath()
+        for k in 0 ..< 3 {
+            let a = CGFloat(k) * .pi / 3
+            p.move(to: CGPoint(x: -cos(a) * 5, y: -sin(a) * 5))
+            p.addLine(to: CGPoint(x: cos(a) * 5, y: sin(a) * 5))
+        }
+        let s = SKShapeNode(path: p)
+        s.strokeColor = .black
+        s.lineWidth = 1.6
+        s.lineCap = .round
+        s.isHidden = true
+        return s
+    }()
 
     init(kind: EnemyKind, hp: CGFloat, speed: CGFloat, damage: CGFloat) {
         self.kind = kind
@@ -66,6 +104,8 @@ final class Enemy: SKNode {
         fig = kind.makeFigure(color: .black)
         super.init()
         addChild(fig)
+        chillMark.position = CGPoint(x: 0, y: hitH + 12)
+        addChild(chillMark)
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -75,6 +115,8 @@ final class Enemy: SKNode {
         let facing: CGFloat = playerX >= position.x ? 1 : -1
         fig.xScale = facing
         chillTimer = max(0, chillTimer - dt)
+        chillMark.isHidden = chillTimer <= 0
+        if chillTimer > 0 { chillMark.zRotation += CGFloat(dt) * 1.6 }   // 천천히 회전
         inMelee = inRange
         if inRange {
             // 공격 주기 시작 직후 0.3초 동안 스윙
@@ -314,7 +356,7 @@ final class GameScene: SKScene {
 
     private func fire(from p: CGPoint, to aim: CGPoint, angleOffset: CGFloat,
                       damageMul: CGFloat, isPower: Bool) {
-        let s = Spear(color: themeColor)
+        let s = Spear(color: themeColor, power: isPower)
         s.position = p
         let v = aimVelocity(from: p, to: aim, speed: stats.spearSpeed)
         s.vel = CGVector(dx: v.dx * cos(angleOffset) - v.dy * sin(angleOffset),
@@ -322,8 +364,6 @@ final class GameScene: SKScene {
         s.zRotation = atan2(s.vel.dy, s.vel.dx)
         s.damage = stats.damage * damageMul
         s.pierce = stats.pierce
-        s.isPower = isPower
-        if isPower { s.setScale(1.25) }
         addChild(s)
         spears.append(s)
     }
@@ -359,7 +399,7 @@ final class GameScene: SKScene {
 
         // 적
         for e in enemies where !e.dying {
-            let inRange = abs(e.position.x - playerX) < 30
+            let inRange = abs(e.position.x - playerX) < 34 + e.hitHalfW   // 몸집만큼 간격을 두고 정지
             e.update(dt: dt, playerX: playerX, inRange: inRange, speedMul: stats.globalSlow)
             if inRange {
                 e.attackTimer -= dt
@@ -387,6 +427,25 @@ final class GameScene: SKScene {
     private func updateSpears(dt: TimeInterval) {
         var dead: [Spear] = []
         for s in spears where !s.landed {
+            // 파워샷 잔상 트레일
+            if s.isPower {
+                s.trailTick += 1
+                if s.trailTick % 3 == 0 {
+                    let seg = SKShapeNode(path: {
+                        let p = CGMutablePath()
+                        p.move(to: .zero)
+                        p.addLine(to: CGPoint(x: -22, y: 0))
+                        return p
+                    }())
+                    seg.strokeColor = themeColor.withAlphaComponent(0.35)
+                    seg.lineWidth = 3.5
+                    seg.lineCap = .round
+                    seg.position = s.position
+                    seg.zRotation = s.zRotation
+                    addChild(seg)
+                    seg.run(.sequence([.fadeOut(withDuration: 0.22), .removeFromParent()]))
+                }
+            }
             s.vel.dy -= Tuning.gravity * CGFloat(dt)
             s.position.x += s.vel.dx * CGFloat(dt)
             s.position.y += s.vel.dy * CGFloat(dt)
@@ -424,8 +483,20 @@ final class GameScene: SKScene {
         if !dead.isEmpty { spears.removeAll { d in dead.contains { $0 === d } } }
     }
 
+    // 콤보 적립. 팝업은 힘 있는 순간(처치, 또는 질풍 연격의 10단위)에만
+    private func bumpCombo(at p: CGPoint, showAlways: Bool) {
+        combo += 1
+        comboTimer = Tuning.comboWindow + stats.comboWindowBonus
+        if combo >= 2, showAlways || combo % 10 == 0 {
+            popText("\(combo) COMBO", at: p, size: 11)
+        }
+    }
+
     // 창 명중: 배율(콤보/브루트/크리) 계산 후 부가 효과(냉기/스플래시/체인) 발동
     private func spearHit(_ s: Spear, _ e: Enemy) {
+        if stats.hitCombo {   // 질풍 연격: 명중마다 콤보
+            bumpCombo(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), showAlways: false)
+        }
         var dmg = s.damage * (1 + min(0.3, CGFloat(combo) * stats.comboDmgPer))
         if e.kind == .brute || e.kind == .juggernaut { dmg *= stats.bruteMul }   // 거인 사냥꾼
         var crit = false
@@ -469,10 +540,8 @@ final class GameScene: SKScene {
                 stats.hp = min(stats.maxHP, stats.hp + stats.lifesteal)
                 hpBar.xScale = max(0, stats.hp / stats.maxHP)
             }
-            combo += 1
-            comboTimer = Tuning.comboWindow + stats.comboWindowBonus
-            if combo >= 2 {
-                popText("\(combo) COMBO", at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), size: 11)
+            if !stats.hitCombo {   // 질풍 연격이면 spearHit에서 이미 적립됨
+                bumpCombo(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), showAlways: true)
             }
         } else {
             e.fig.run(.sequence([.fadeAlpha(to: 0.35, duration: 0.05), .fadeAlpha(to: 1, duration: 0.12)]))
@@ -737,7 +806,7 @@ extension GameScene {
     func simChooseBest() {
         guard state == .choosing else { return }
         let priority = ["trident", "multi", "damage", "haste", "master", "crit", "power",
-                        "splash", "chain", "pierce", "double", "combo", "giant", "execute",
+                        "splash", "chain", "hitcombo", "pierce", "double", "combo", "giant", "execute",
                         "hone", "focus", "slow", "chill", "leech", "velocity", "heal", "tough", "knock"]
         let best = pendingUpgrades.indices.min {
             (priority.firstIndex(of: pendingUpgrades[$0].id) ?? 99)

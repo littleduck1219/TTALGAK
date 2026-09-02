@@ -144,6 +144,7 @@ enum UpgradeEffect {
     case chain(CGFloat)           // 번개 연쇄
     case revive
     case master                   // 명장의 창 (크리 복합)
+    case hitCombo                 // 질풍 연격: 콤보가 처치 → 명중 기준으로
 }
 
 struct UpgradeDef {
@@ -183,6 +184,7 @@ enum Upgrades {
         .init(id: "phoenix", tier: .unique, title: "불사조", desc: "죽음을 1회 무시하고 부활", effect: .revive),
         .init(id: "master", tier: .unique, title: "명장의 창", desc: "치명타 확률 +25%p, 피해 +50%p", effect: .master),
         .init(id: "trident", tier: .unique, title: "삼지창", desc: "동시 투척 창 +2", effect: .multishot(2)),
+        .init(id: "hitcombo", tier: .unique, title: "질풍 연격", desc: "콤보가 처치가 아닌 명중마다 쌓임", effect: .hitCombo),
     ]
 }
 
@@ -209,6 +211,7 @@ struct Stats {
     var bruteMul: CGFloat = 1
     var chainRatio: CGFloat = 0
     var hasRevive = false
+    var hitCombo = false          // 질풍 연격
 
     mutating func apply(_ u: UpgradeDef) {
         switch u.effect {
@@ -234,6 +237,7 @@ struct Stats {
         case .chain(let r): chainRatio = max(chainRatio, r)
         case .revive: hasRevive = true
         case .master: critChance = min(1, critChance + 0.25); critMul += 0.5
+        case .hitCombo: hitCombo = true
         }
     }
 }
