@@ -170,7 +170,7 @@ final class GameScene: SKScene {
     var onInteractive: ((Bool) -> Void)?
     var onHide: (() -> Void)?               // 우클릭: 일시정지 + 창 숨기기 (복귀는 상태바 메뉴)
     private(set) var isGamePaused = false
-    private var pauseLabel: SKLabelNode?
+    private var pauseLabel: SKNode?
 
     private enum State { case playing, choosing, gameover }
     private var state = State.playing
@@ -378,6 +378,7 @@ final class GameScene: SKScene {
     // MARK: - 메인 루프
 
     override func update(_ currentTime: TimeInterval) {
+        if isGamePaused { lastTime = currentTime; return }
         let dt = lastTime == 0 ? 1.0 / 60 : min(1.0 / 30, currentTime - lastTime)
         lastTime = currentTime
 
@@ -766,16 +767,29 @@ final class GameScene: SKScene {
     func setGamePaused(_ flag: Bool) {
         guard flag != isGamePaused else { return }
         isGamePaused = flag
-        view?.isPaused = flag   // 시뮬레이션·액션 전체 동결 (렌더는 유지)
+        // 주의: view.isPaused는 렌더까지 멈춰 표시가 안 보임 → 씬 액션 동결 + update() 가드로 처리
+        isPaused = flag
         if flag {
-            let l = SKLabelNode(fontNamed: "AvenirNext-Bold")
-            l.text = "PAUSED — Space"
-            l.fontSize = 15
-            l.fontColor = themeColor.withAlphaComponent(0.9)
-            l.position = CGPoint(x: size.width / 2, y: size.height / 2)
-            l.zPosition = 90
-            addChild(l)
-            pauseLabel = l
+            let box = SKShapeNode(rectOf: CGSize(width: 190, height: 52), cornerRadius: 10)
+            box.fillColor = SKColor(white: 0.05, alpha: 0.88)
+            box.strokeColor = SKColor(white: 1, alpha: 0.6)
+            box.lineWidth = 1.2
+            box.position = CGPoint(x: size.width / 2, y: size.height / 2 + 10)
+            box.zPosition = 90
+            let l1 = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            l1.text = "❚❚  일시정지"
+            l1.fontSize = 15
+            l1.fontColor = .white
+            l1.position = CGPoint(x: 0, y: 4)
+            box.addChild(l1)
+            let l2 = SKLabelNode(fontNamed: "AvenirNext-Regular")
+            l2.text = "Space 또는 클릭으로 재개"
+            l2.fontSize = 10
+            l2.fontColor = SKColor(white: 1, alpha: 0.7)
+            l2.position = CGPoint(x: 0, y: -16)
+            box.addChild(l2)
+            addChild(box)
+            pauseLabel = box
         } else {
             pauseLabel?.removeFromParent()
             pauseLabel = nil
@@ -796,6 +810,7 @@ final class GameScene: SKScene {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if isGamePaused { setGamePaused(false); return }   // 클릭으로 재개
         let loc = event.location(in: self)
         let names = nodes(at: loc).compactMap(\.name)
         if state == .choosing, let name = names.first(where: { $0.hasPrefix("card") }),

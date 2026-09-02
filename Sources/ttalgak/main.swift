@@ -188,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         skView.allowsTransparency = true
         skView.presentScene(scene)
         window.makeFirstResponder(scene)
-        skView.isPaused = scene.isGamePaused   // 사용자가 걸어둔 일시정지는 유지
+        skView.isPaused = false   // 게임 일시정지는 씬 레벨(isGamePaused)이라 뷰는 항상 렌더
         window.orderFrontRegardless()
     }
 
