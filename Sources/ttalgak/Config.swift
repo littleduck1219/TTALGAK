@@ -9,27 +9,27 @@ enum Tuning {
     static let dockGap: CGFloat = 16          // 독 위로 띄우는 간격
 
     // 스틱맨
-    static let playerMaxHP: CGFloat = 100
+    static let playerMaxHP: CGFloat = 140
     static let playerMargin: CGFloat = 70     // 화면 끝에서 스틱맨까지
 
     // 창(spear)
     static let spearSpeed: CGFloat = 760   // 최대 사거리 = v²/g. 화면 폭(900)을 커버해야 함
-    static let spearDamage: CGFloat = 10
+    static let spearDamage: CGFloat = 12
     static let gravity: CGFloat = 650
-    static let throwCooldown: TimeInterval = 1.1
+    static let throwCooldown: TimeInterval = 0.9
     static let spearLen: CGFloat = 74        // 캐릭터 키(~64)보다 길게
 
     // 적 — 체력은 선형×지수 복합 성장: 플레이어 화력(카드 중첩=지수)과 경쟁하도록
     static let enemyBaseHP: CGFloat = 10
-    static let enemyHPGrowth: CGFloat = 0.22      // 선형항: 웨이브당 +22%
+    static let enemyHPGrowth: CGFloat = 0.18      // 선형항: 웨이브당 +18%
     static let enemyHPExpo: CGFloat = 1.05        // 지수항: 웨이브당 ×1.05 (후반 압박 담당)
-    static let enemySpeed: CGFloat = 55
+    static let enemySpeed: CGFloat = 50
     static let enemySpeedGrowth: CGFloat = 0.04
     static let enemyDamage: CGFloat = 8
     static let enemyDmgGrowth: CGFloat = 0.03     // 접촉 데미지도 성장 — 후반 누수가 아프도록
     static let enemyAttackInterval: TimeInterval = 1.0
-    static let waveBaseCount = 4
-    static let waveCountGrowth = 2                // 웨이브당 +2마리
+    static let waveBaseCount = 5
+    static let waveCountGrowth = 1                // 웨이브당 +1마리
     static let spawnIntervalMin: TimeInterval = 0.35   // 스폰 간격 불규칙 범위
     static let spawnIntervalMax: TimeInterval = 1.7    // 웨이브당 -0.05씩 조여짐 (하한 0.5)
 
@@ -37,7 +37,7 @@ enum Tuning {
     static let comboWindow: TimeInterval = 3.0
 
     // 웨이브 클리어 보상: 소량 회복 — 누수 한 번이 사망 나선이 되지 않게
-    static let waveClearHeal: CGFloat = 12
+    static let waveClearHeal: CGFloat = 22
 
     // 던지기 모션 키포즈 타이밍(초) — 모션 튜닝은 여기
     static let windupDur: TimeInterval = 0.28
@@ -68,7 +68,7 @@ enum EnemyKind: CaseIterable {
     var hpMul: CGFloat {
         switch self {
         case .grunt: 1.0; case .runner: 0.45; case .brute: 3.5
-        case .wyvern: 1.8; case .reaper: 5.0; case .juggernaut: 8.0
+        case .wyvern: 1.8; case .reaper: 4.0; case .juggernaut: 6.5
         }
     }
     var speedMul: CGFloat {

@@ -395,7 +395,7 @@ final class GameScene: SKScene {
                 spawnIndex += 1
                 toSpawn -= 1
                 // 하운드는 무리지어 등장
-                if kind == .runner, toSpawn > 0, Bool.random() {
+                if kind == .runner, toSpawn > 0, Double.random(in: 0 ..< 1) < 0.35 {
                     spawnEnemy(.runner, offset: 26)
                     toSpawn -= 1
                 }
