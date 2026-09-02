@@ -172,16 +172,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.screensDidWakeNotification, object: nil)
     }
 
+    private var lockPaused = false   // 실제 잠금이 있었을 때만 복구 동작
+
     @objc func screenLocked() {
+        lockPaused = true
         skView.isPaused = true
     }
 
     @objc func screenUnlocked() {
-        // 씬을 떼었다 재부착해 SKView의 렌더 레이어를 강제 재생성
-        skView.isPaused = false
+        // 재부착(렌더러 재생성)은 비싸다 — 실제 잠금 후 해제일 때만 1회.
+        // screensDidWake는 디스플레이 dim/절전 복귀마다 오므로 가드 없으면 렌더 루프가 누적돼 시스템이 버벅임
+        guard lockPaused else { return }
+        lockPaused = false
         skView.presentScene(nil)
         skView.allowsTransparency = true
         skView.presentScene(scene)
+        window.makeFirstResponder(scene)
+        skView.isPaused = scene.isGamePaused   // 사용자가 걸어둔 일시정지는 유지
         window.orderFrontRegardless()
     }
 
