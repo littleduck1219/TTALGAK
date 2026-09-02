@@ -49,7 +49,11 @@
 
 ## 설치 & 실행
 
-macOS 13+, Xcode Command Line Tools만 있으면 된다.
+**[📦 Releases에서 TTALGAK.app 다운로드](https://github.com/littleduck1219/TTALGAK/releases/latest)** — macOS 13+ (Apple Silicon / Intel)
+
+zip을 풀고 `TTALGAK.app`을 실행하면 끝. 서명되지 않은 앱이라 첫 실행 시 경고가 뜨면 **우클릭 → 열기** (또는 시스템 설정 → 개인정보 보호 및 보안 → "확인 없이 열기").
+
+소스에서 직접 빌드하려면 (Xcode Command Line Tools 필요):
 
 ```bash
 git clone https://github.com/littleduck1219/TTALGAK.git
@@ -57,6 +61,8 @@ cd TTALGAK
 swift build -c release
 .build/release/ttalgak
 ```
+
+앱 번들 생성은 `./scripts/make_app.sh`.
 
 ## 개발자용
 
