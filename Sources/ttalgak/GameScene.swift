@@ -78,6 +78,7 @@ final class Enemy: SKNode {
     var blinkTimer: TimeInterval = .random(in: 1.5 ... 2.5)   // 리퍼 순간이동 주기
     var inMelee = false   // 근접 공격 중 (와이번은 급강하로 낮아지므로 명중 하한 해제)
     var dying = false
+    private var poseAccum: TimeInterval = 0   // 포즈 리샘플 스로틀 (이동은 60fps, 포즈는 30fps)
     private let chillMark: SKShapeNode = {   // 슬로우 표시: 머리 위 눈꽃(*)
         let p = CGMutablePath()
         for k in 0 ..< 3 {
@@ -118,15 +119,18 @@ final class Enemy: SKNode {
         chillMark.isHidden = chillTimer <= 0
         if chillTimer > 0 { chillMark.zRotation += CGFloat(dt) * 1.6 }   // 천천히 회전
         inMelee = inRange
+        poseAccum += dt
+        let resample = poseAccum >= 1.0 / 30   // SKShapeNode 경로 재생성은 30fps면 충분 (비용 절반)
+        if resample { poseAccum = 0 }
         if inRange {
             // 공격 주기 시작 직후 0.3초 동안 스윙
             let t = CGFloat(min(1, (Tuning.enemyAttackInterval - attackTimer) / 0.3))
-            fig.attack(sin(t * .pi))
+            if resample { fig.attack(sin(t * .pi)) }
         } else {
             let mul = speedMul * (chillTimer > 0 ? 0.7 : 1)
             walkPhase += CGFloat(dt) * kind.gaitFreq * mul
             position.x += facing * moveSpeed * mul * CGFloat(dt)
-            fig.animate(phase: walkPhase)
+            if resample { fig.animate(phase: walkPhase) }
             if kind == .reaper {   // 주기적 순간이동 전진
                 blinkTimer -= dt
                 if blinkTimer <= 0 {

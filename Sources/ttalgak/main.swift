@@ -123,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         skView = SKView(frame: NSRect(origin: .zero, size: size))
         skView.allowsTransparency = true
         skView.ignoresSiblingOrder = true
+        skView.preferredFramesPerSecond = 60   // ProMotion(120Hz)에서 렌더 부하 2배 방지
         scene = GameScene(size: CGSize(width: size.width, height: size.height))
         scene.scaleMode = .resizeFill
         scene.onInteractive = { [weak self] interactive in

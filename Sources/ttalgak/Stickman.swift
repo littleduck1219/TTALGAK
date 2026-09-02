@@ -206,11 +206,17 @@ final class Player: SKNode {
         heldRotFrom = heldSpear.zRotation
     }
 
+    private var idleAccum: TimeInterval = 0
+
     func update(dt: TimeInterval) {
         idleTime += dt
         guard !segs.isEmpty else {
-            fig.apply(currentIdlePose())
-            syncHeldSpear(rotation: 0.9)
+            idleAccum += dt   // 대기 호흡은 30fps 리샘플로 충분 (던질 때는 60fps 유지)
+            if idleAccum >= 1.0 / 30 {
+                idleAccum = 0
+                fig.apply(currentIdlePose())
+                syncHeldSpear(rotation: 0.9)
+            }
             return
         }
         segT += dt
