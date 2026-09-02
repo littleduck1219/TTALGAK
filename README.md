@@ -50,7 +50,9 @@
 
 ## 설치 & 실행
 
-**[📦 Releases에서 TTALGAK.app 다운로드](https://github.com/littleduck1219/TTALGAK/releases/latest)** — macOS 13+ (Apple Silicon / Intel)
+**[📦 Releases에서 다운로드](https://github.com/littleduck1219/TTALGAK/releases)** — macOS 13+ (TTALGAK.app) / Windows 10+ 64bit (TTALGAK.exe, 베타)
+
+Windows: zip을 풀고 `TTALGAK.exe` 실행. 조작은 클릭=투척, Space=일시정지, 우클릭=최소화, F=좌우반전, T=테마, R=재시작, Esc=종료. SmartScreen 경고 시 "추가 정보 → 실행".
 
 zip을 풀고 `TTALGAK.app`을 실행하면 끝. 서명되지 않은 앱이라 첫 실행 시 경고가 뜨면 **우클릭 → 열기** (또는 시스템 설정 → 개인정보 보호 및 보안 → "확인 없이 열기").
 
