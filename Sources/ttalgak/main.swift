@@ -129,8 +129,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scene.onInteractive = { [weak self] interactive in
             if interactive { self?.window.makeKeyAndOrderFront(nil) }
         }
+        scene.onHide = { [weak self] in self?.window.orderOut(nil) }
         window.contentView = skView
         skView.presentScene(scene)
+        window.makeFirstResponder(scene)   // 스페이스바 일시정지 수신
         window.orderFrontRegardless()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -144,6 +146,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         theme.target = self
         theme.state = UserDefaults.standard.bool(forKey: "whiteTheme") ? .on : .off
         menu.addItem(theme)
+        let pause = NSMenuItem(title: "일시정지/재개 (Space)", action: #selector(togglePause), keyEquivalent: "")
+        pause.target = self
+        menu.addItem(pause)
+        let hide = NSMenuItem(title: "숨기기/보이기 (우클릭)", action: #selector(toggleHide), keyEquivalent: "")
+        hide.target = self
+        menu.addItem(hide)
         let restart = NSMenuItem(title: "다시 시작", action: #selector(restartGame), keyEquivalent: "")
         restart.target = self
         menu.addItem(restart)
@@ -187,6 +195,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let white = !UserDefaults.standard.bool(forKey: "whiteTheme")
         scene.setTheme(white: white)
         sender.state = white ? .on : .off
+    }
+
+    @objc func togglePause() { scene.setGamePaused(!scene.isGamePaused) }
+
+    @objc func toggleHide() {
+        if window.isVisible {
+            scene.setGamePaused(true)
+            window.orderOut(nil)
+        } else {
+            window.orderFrontRegardless()
+            scene.setGamePaused(false)
+        }
     }
 
     @objc func restartGame() { scene.restart() }

@@ -168,6 +168,9 @@ func aimVelocity(from p: CGPoint, to t: CGPoint, speed v: CGFloat) -> CGVector {
 
 final class GameScene: SKScene {
     var onInteractive: ((Bool) -> Void)?
+    var onHide: (() -> Void)?               // 우클릭: 일시정지 + 창 숨기기 (복귀는 상태바 메뉴)
+    private(set) var isGamePaused = false
+    private var pauseLabel: SKLabelNode?
 
     private enum State { case playing, choosing, gameover }
     private var state = State.playing
@@ -756,6 +759,40 @@ final class GameScene: SKScene {
         onInteractive?(false)
         wave += 1
         startWave()
+    }
+
+    // MARK: - 일시정지
+
+    func setGamePaused(_ flag: Bool) {
+        guard flag != isGamePaused else { return }
+        isGamePaused = flag
+        view?.isPaused = flag   // 시뮬레이션·액션 전체 동결 (렌더는 유지)
+        if flag {
+            let l = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            l.text = "PAUSED — Space"
+            l.fontSize = 15
+            l.fontColor = themeColor.withAlphaComponent(0.9)
+            l.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            l.zPosition = 90
+            addChild(l)
+            pauseLabel = l
+        } else {
+            pauseLabel?.removeFromParent()
+            pauseLabel = nil
+        }
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 49 {   // Space
+            setGamePaused(!isGamePaused)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        setGamePaused(true)
+        onHide?()
     }
 
     override func mouseDown(with event: NSEvent) {
