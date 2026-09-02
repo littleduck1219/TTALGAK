@@ -59,13 +59,13 @@ enum EnemyKind: CaseIterable {
     var unlockWave: Int {
         switch self {
         case .grunt: 1; case .runner: 2; case .brute: 4
-        case .wyvern: 5; case .reaper: 6; case .juggernaut: 8
+        case .wyvern: 6; case .reaper: 7; case .juggernaut: 9
         }
     }
     var hpMul: CGFloat {
         switch self {
         case .grunt: 1.0; case .runner: 0.45; case .brute: 3.5
-        case .wyvern: 2.2; case .reaper: 5.0; case .juggernaut: 8.0
+        case .wyvern: 1.8; case .reaper: 5.0; case .juggernaut: 8.0
         }
     }
     var speedMul: CGFloat {

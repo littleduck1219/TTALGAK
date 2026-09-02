@@ -234,9 +234,9 @@ final class GameScene: SKScene {
         spawnIndex = 0
         // 정예 편성: 웨이브 5+ 1마리, 9+ 2마리. 스폰 순번 중간 이후 랜덤 슬롯에 배치
         eliteAt = [:]
-        if wave >= 5 {
+        if wave >= 6 {
             let unlocked = EnemyKind.allCases.filter { $0.isElite && wave >= $0.unlockWave }
-            let count = min(5, 1 + (wave - 5) / 4)   // w5:1, w9:2, w13:3, w17:4, w21+:5
+            let count = min(5, 1 + (wave - 6) / 4)   // w6:1, w10:2, w14:3, w18:4, w22+:5
             var slots = Array(1 ..< toSpawn).shuffled()
             for _ in 0 ..< count {
                 if let kind = unlocked.randomElement(), let slot = slots.popLast() {
@@ -403,9 +403,13 @@ final class GameScene: SKScene {
             }
 
             for e in enemies where !e.dying && !s.hitSet.contains(ObjectIdentifier(e)) {
-                if abs(tip.x - e.position.x) < e.hitHalfW,
-                   tip.y < e.position.y + e.hitH,
-                   tip.y >= e.position.y + (e.inMelee ? 0 : e.kind.hitYMin) {   // 와이번: 비행 중엔 낮은 창이 밑으로 통과, 근접 급강하 중엔 전신 판정
+                // 촉 + 창 중심 두 점 판정: 딱 붙은 적은 촉이 스폰 순간 이미 지나쳐 있어 중심점이 잡아줌
+                let yMin = e.position.y + (e.inMelee ? 0 : e.kind.hitYMin)   // 와이번: 비행 중엔 낮은 창이 밑으로 통과
+                let yMax = e.position.y + e.hitH
+                let hit = [tip, s.position].contains {
+                    abs($0.x - e.position.x) < e.hitHalfW && $0.y < yMax && $0.y >= yMin
+                }
+                if hit {
                     s.hitSet.insert(ObjectIdentifier(e))
                     spearHit(s, e)
                     s.pierce -= 1
