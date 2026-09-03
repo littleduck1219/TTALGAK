@@ -11,6 +11,8 @@ swift build -c release --arch arm64 --arch x86_64
 rm -rf dist
 mkdir -p "$APP/Contents/MacOS"
 cp .build/apple/Products/Release/ttalgak "$APP/Contents/MacOS/ttalgak"
+mkdir -p "$APP/Contents/Resources"
+cp -R .build/apple/Products/Release/ttalgak_ttalgak.bundle "$APP/Contents/Resources/"   # 사운드 리소스 (Bundle.module 탐색 경로)
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

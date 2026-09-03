@@ -142,6 +142,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flip.target = self
         flip.state = UserDefaults.standard.bool(forKey: "mirrored") ? .on : .off
         menu.addItem(flip)
+        let sound = NSMenuItem(title: "소리", action: #selector(toggleSound), keyEquivalent: "")
+        sound.target = self
+        sound.state = Sound.shared.enabled ? .on : .off
+        menu.addItem(sound)
         let theme = NSMenuItem(title: "흰색 테마", action: #selector(toggleTheme), keyEquivalent: "")
         theme.target = self
         theme.state = UserDefaults.standard.bool(forKey: "whiteTheme") ? .on : .off
@@ -202,6 +206,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let white = !UserDefaults.standard.bool(forKey: "whiteTheme")
         scene.setTheme(white: white)
         sender.state = white ? .on : .off
+    }
+
+    @objc func toggleSound(_ sender: NSMenuItem) {
+        Sound.shared.enabled.toggle()
+        sender.state = Sound.shared.enabled ? .on : .off
+        Sound.shared.play("card")   // 켤 때 확인음
     }
 
     @objc func togglePause() { scene.setGamePaused(!scene.isGamePaused) }

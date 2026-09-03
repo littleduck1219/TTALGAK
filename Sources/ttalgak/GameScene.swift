@@ -199,6 +199,7 @@ final class GameScene: SKScene {
     private var pendingUpgrades: [UpgradeDef] = []
     private var uniquesTaken = Set<String>()
     private var throwCount = 0
+    private var hitstop: TimeInterval = 0
 
     private var playerX: CGFloat { mirrored ? size.width - Tuning.playerMargin : Tuning.playerMargin }
 
@@ -344,6 +345,7 @@ final class GameScene: SKScene {
         throwCount += 1
         let isPower = stats.powershotEvery > 0 && throwCount % stats.powershotEvery == 0
         let hand = player.fig.hand.convert(CGPoint.zero, to: self)
+        Sound.shared.play(isPower ? "power" : "throw")
         fireVolley(from: hand, to: aim, isPower: isPower)
         if Double.random(in: 0 ..< 1) < stats.doubleThrowChance {
             run(.sequence([.wait(forDuration: 0.1), .run { [weak self] in
@@ -381,6 +383,10 @@ final class GameScene: SKScene {
         if isGamePaused { lastTime = currentTime; return }
         let dt = lastTime == 0 ? 1.0 / 60 : min(1.0 / 30, currentTime - lastTime)
         lastTime = currentTime
+        if hitstop > 0 {   // 처치 순간 짧은 프레임 정지 (타격감)
+            hitstop -= dt
+            return
+        }
 
         player.update(dt: dt)
         updateSpears(dt: dt)
@@ -544,6 +550,9 @@ final class GameScene: SKScene {
         if e.hp <= 0 {
             e.die()
             enemies.removeAll { $0 === e }
+            Sound.shared.play(crit ? "crit" : "kill")
+            hitstop = min(0.08, hitstop + (crit ? 0.05 : 0.03))   // 히트스톱
+            deathBurst(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH * 0.5))
             if stats.lifesteal > 0 {
                 stats.hp = min(stats.maxHP, stats.hp + stats.lifesteal)
                 hpBar.xScale = max(0, stats.hp / stats.maxHP)
@@ -552,8 +561,30 @@ final class GameScene: SKScene {
                 bumpCombo(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), showAlways: true)
             }
         } else {
+            Sound.shared.play(crit ? "crit" : "hit")
             e.fig.run(.sequence([.fadeAlpha(to: 0.35, duration: 0.05), .fadeAlpha(to: 1, duration: 0.12)]))
             e.position.x += (e.position.x > playerX ? 1 : -1) * knockback * e.kind.knockbackMul
+        }
+    }
+
+    // 처치 파티클: 흑백 조각이 튀며 페이드
+    private func deathBurst(at p: CGPoint) {
+        for _ in 0 ..< 6 {
+            let shard = SKShapeNode(rectOf: CGSize(width: 3.2, height: 3.2))
+            shard.fillColor = themeColor
+            shard.strokeColor = .clear
+            shard.position = p
+            shard.zRotation = .random(in: 0 ..< (2 * .pi))
+            addChild(shard)
+            let ang = CGFloat.random(in: 0 ..< (2 * .pi))
+            let dist = CGFloat.random(in: 18 ... 44)
+            let dest = CGPoint(x: p.x + cos(ang) * dist, y: p.y + sin(ang) * dist * 0.7 + 6)
+            let move = SKAction.move(to: dest, duration: 0.32)
+            move.timingMode = .easeOut
+            shard.run(.sequence([
+                .group([move, .fadeOut(withDuration: 0.36), .rotate(byAngle: 2.2, duration: 0.36)]),
+                .removeFromParent(),
+            ]))
         }
     }
 
@@ -720,6 +751,7 @@ final class GameScene: SKScene {
 
     private func gameOver() {
         guard state != .gameover else { return }   // 오버레이 중복 생성 방지
+        Sound.shared.play("gameover")
         state = .gameover
         overlay?.removeFromParent()                // 혹시 남은 오버레이(카드 등) 정리
         let node = SKNode()
@@ -751,6 +783,7 @@ final class GameScene: SKScene {
     private func selectUpgrade(_ i: Int) {
         guard state == .choosing, i < pendingUpgrades.count else { return }
         let pick = pendingUpgrades[i]
+        Sound.shared.play("card")
         stats.apply(pick)
         if pick.tier == .unique { uniquesTaken.insert(pick.id) }   // 유니크는 1회 한정
         stats.hp = min(stats.maxHP, stats.hp + Tuning.waveClearHeal)   // 클리어 보상 회복
@@ -848,6 +881,9 @@ func runSelfTest() {
     // 포즈 보간 중간값
     let mid = Pose.lerp(.idle, .windup, 0.5)
     assert(abs(mid.lean - (Pose.idle.lean + Pose.windup.lean) / 2) < 0.0001, "pose lerp broken")
+
+    // 효과음 번들 로드
+    assert(Sound.shared.loadedCount == 7, "sounds not loaded: \(Sound.shared.loadedCount)/7")
 
     print("selftest ok")
 }

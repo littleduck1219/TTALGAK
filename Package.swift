@@ -5,6 +5,10 @@ let package = Package(
     name: "ttalgak",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "ttalgak", path: "Sources/ttalgak")
+        .executableTarget(
+            name: "ttalgak",
+            path: "Sources/ttalgak",
+            resources: [.copy("Sounds")]
+        )
     ]
 )
