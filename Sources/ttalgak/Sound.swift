@@ -3,6 +3,7 @@ import AVFoundation
 // 효과음: Sounds/*.wav (합성 8bit풍). 사운드별 플레이어 풀로 겹침 재생 허용.
 final class Sound {
     static let shared = Sound()
+    static var forceMuted = false   // --muted: 자동 테스트용 일회성 뮤트 (설정 저장 안 함)
 
     var enabled = !UserDefaults.standard.bool(forKey: "muted") {
         didSet { UserDefaults.standard.set(!enabled, forKey: "muted") }
@@ -30,7 +31,7 @@ final class Sound {
     var loadedCount: Int { pools.count }
 
     func play(_ name: String) {
-        guard enabled, let pool = pools[name], !pool.isEmpty else { return }
+        guard enabled, !Sound.forceMuted, let pool = pools[name], !pool.isEmpty else { return }
         // 같은 소리의 같은 프레임 다중 호출(멀티샷 동시 명중) 스로틀 — play()는 싸지 않다
         let now = ProcessInfo.processInfo.systemUptime
         if let t = lastPlay[name], now - t < 0.04 { return }

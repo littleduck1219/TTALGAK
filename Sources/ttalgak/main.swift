@@ -1,6 +1,10 @@
 import AppKit
 import SpriteKit
 
+if CommandLine.arguments.contains("--muted") {
+    Sound.forceMuted = true
+}
+
 if CommandLine.arguments.contains("--selftest") {
     runSelfTest()
     exit(0)
@@ -9,12 +13,15 @@ if CommandLine.arguments.contains("--selftest") {
 // 밸런스 자동 테스트: --simulate [maxWave] — 봇이 정확도별로 플레이해 난이도 곡선 출력
 if let idx = CommandLine.arguments.firstIndex(of: "--simulate") {
     let maxWave = CommandLine.arguments.count > idx + 1 ? Int(CommandLine.arguments[idx + 1]) ?? 30 : 30
-    print("=== ttalgak 밸런스 시뮬레이션 (최대 \(maxWave)웨이브, 60fps 수동 스텝) ===")
+    let simDiff = CommandLine.arguments.count > idx + 2
+        ? (Difficulty(rawValue: CommandLine.arguments[idx + 2]) ?? .normal) : .normal
+    print("=== ttalgak 밸런스 시뮬레이션 (최대 \(maxWave)웨이브, 난이도 \(simDiff.rawValue)) ===")
     for acc in [CGFloat(0.95), 0.8, 0.6] {
         for run in 1 ... 3 {
             let view = SKView(frame: NSRect(x: 0, y: 0, width: Tuning.sceneW, height: Tuning.sceneH))
             let scene = GameScene(size: CGSize(width: Tuning.sceneW, height: Tuning.sceneH))
             scene.scaleMode = .resizeFill
+            scene.difficulty = simDiff
             view.presentScene(scene)
             var frame = 0
             var lastWave = 1
@@ -105,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var scene: GameScene!
     var skView: SKView!
     var statusItem: NSStatusItem!
+    var diffItems: [Difficulty: NSMenuItem] = [:]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let screen = NSScreen.main!.visibleFrame   // 독/메뉴바 제외 영역
@@ -142,6 +150,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flip.target = self
         flip.state = UserDefaults.standard.bool(forKey: "mirrored") ? .on : .off
         menu.addItem(flip)
+        let diffMenu = NSMenu()
+        for d in Difficulty.allCases {
+            let item = NSMenuItem(title: d.title, action: #selector(pickDifficulty(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = d.rawValue
+            item.state = Difficulty.saved == d ? .on : .off
+            diffMenu.addItem(item)
+            diffItems[d] = item
+        }
+        let diff = NSMenuItem(title: "난이도", action: nil, keyEquivalent: "")
+        diff.submenu = diffMenu
+        menu.addItem(diff)
         let sound = NSMenuItem(title: "소리", action: #selector(toggleSound), keyEquivalent: "")
         sound.target = self
         sound.state = Sound.shared.enabled ? .on : .off
@@ -206,6 +226,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let white = !UserDefaults.standard.bool(forKey: "whiteTheme")
         scene.setTheme(white: white)
         sender.state = white ? .on : .off
+    }
+
+    @objc func pickDifficulty(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let d = Difficulty(rawValue: raw) else { return }
+        UserDefaults.standard.set(d.rawValue, forKey: "difficulty")
+        scene.difficulty = d   // 새 스폰/다음 웨이브부터 적용
+        for (k, item) in diffItems { item.state = k == d ? .on : .off }
     }
 
     @objc func toggleSound(_ sender: NSMenuItem) {

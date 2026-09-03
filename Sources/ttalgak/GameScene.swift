@@ -200,6 +200,7 @@ final class GameScene: SKScene {
     private var uniquesTaken = Set<String>()
     private var throwCount = 0
     private var hitstop: TimeInterval = 0
+    var difficulty = Difficulty.saved   // 적 스탯 배율 (메뉴/시뮬레이터가 설정)
     private var fxBudget = 8
 
     // 이펙트 노드(특히 SKLabelNode)는 생성이 비싸다 — 예산 초과분은 시각만 생략 (데미지는 그대로)
@@ -286,7 +287,7 @@ final class GameScene: SKScene {
     // MARK: - 웨이브
 
     private func startWave() {
-        toSpawn = Tuning.waveBaseCount + Tuning.waveCountGrowth * (wave - 1)
+        toSpawn = max(1, Int((CGFloat(Tuning.waveBaseCount + Tuning.waveCountGrowth * (wave - 1)) * difficulty.countMul).rounded()))
         spawnTimer = 0.5
         throwTimer = 0.6
         spawnIndex = 0
@@ -326,9 +327,9 @@ final class GameScene: SKScene {
     private func spawnEnemy(_ kind: EnemyKind, offset: CGFloat = 0) {
         let w = CGFloat(wave - 1)
         let hpGrowth = (1 + Tuning.enemyHPGrowth * w) * pow(Tuning.enemyHPExpo, w)
-        let hp = Tuning.enemyBaseHP * kind.hpMul * hpGrowth
+        let hp = Tuning.enemyBaseHP * kind.hpMul * hpGrowth * difficulty.hpMul
         let sp = Tuning.enemySpeed * kind.speedMul * (1 + Tuning.enemySpeedGrowth * w)
-        let dmg = Tuning.enemyDamage * kind.dmgMul * (1 + Tuning.enemyDmgGrowth * w)
+        let dmg = Tuning.enemyDamage * kind.dmgMul * (1 + Tuning.enemyDmgGrowth * w) * difficulty.dmgMul
         let e = Enemy(kind: kind, hp: hp, speed: sp, damage: dmg)
         e.tintShapes(themeColor)
         let edge: CGFloat = mirrored ? -30 - offset : size.width + 30 + offset
@@ -775,7 +776,7 @@ final class GameScene: SKScene {
         box.position = CGPoint(x: size.width / 2, y: size.height / 2 + 10)
         box.name = "restart"
         let l1 = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        l1.text = "GAME OVER — WAVE \(wave)"
+        l1.text = "GAME OVER — WAVE \(wave) · \(difficulty.title)"
         l1.fontSize = 16
         l1.position = CGPoint(x: 0, y: 10)
         l1.name = "restart"

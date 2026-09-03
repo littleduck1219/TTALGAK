@@ -9,6 +9,7 @@ import (
 	_ "embed"
 	"image/color"
 	"log"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -29,6 +30,11 @@ func drawTextCenter(dst *ebiten.Image, s string, size, x, gy float64, col color.
 }
 
 func main() {
+	for _, arg := range os.Args[1:] {
+		if arg == "-muted" || arg == "--muted" {
+			soundOn = false // 자동 테스트용
+		}
+	}
 	src, err := text.NewGoTextFaceSource(bytes.NewReader(fontBytes))
 	if err != nil {
 		log.Fatal(err)

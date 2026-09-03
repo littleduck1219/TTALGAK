@@ -40,6 +40,48 @@ const (
 	groundY            = 26.0
 )
 
+// ── 난이도 모드 (적 스탯에만 배율) ──
+
+type difficulty int
+
+const (
+	dEasy difficulty = iota
+	dNormal
+	dHard
+)
+
+func (d difficulty) title() string {
+	switch d {
+	case dEasy:
+		return "이지"
+	case dHard:
+		return "하드"
+	}
+	return "노멀"
+}
+
+func (d difficulty) hpMul() float64 {
+	switch d {
+	case dEasy:
+		return 0.7
+	case dHard:
+		return 1.3
+	}
+	return 1.0
+}
+
+func (d difficulty) dmgMul() float64 { return d.hpMul() }
+
+func (d difficulty) countMul() float64 {
+	switch d {
+	case dEasy:
+		return 0.85
+	case dHard:
+		return 1.15
+	}
+	return 1.0
+}
+
 // ── 적 유형 ──
 
 type enemyKind int

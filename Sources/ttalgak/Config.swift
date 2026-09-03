@@ -46,6 +46,22 @@ enum Tuning {
     static let recoverDur: TimeInterval = 0.20
 }
 
+// 난이도 모드: 적 스탯에만 배율 적용 (플레이어/카드 불변)
+enum Difficulty: String, CaseIterable {
+    case easy, normal, hard
+
+    var title: String {
+        switch self { case .easy: return "이지"; case .normal: return "노멀"; case .hard: return "하드" }
+    }
+    var hpMul: CGFloat { switch self { case .easy: 0.7; case .normal: 1.0; case .hard: 1.3 } }
+    var dmgMul: CGFloat { switch self { case .easy: 0.7; case .normal: 1.0; case .hard: 1.3 } }
+    var countMul: CGFloat { switch self { case .easy: 0.85; case .normal: 1.0; case .hard: 1.15 } }
+
+    static var saved: Difficulty {
+        Difficulty(rawValue: UserDefaults.standard.string(forKey: "difficulty") ?? "") ?? .normal
+    }
+}
+
 // 적 유형: 흑백 크리처 실루엣과 모션으로 구분
 // 하급(grunt/runner/brute)은 물량, 정예(wyvern/reaper/juggernaut)는 저빈도 고위협 (보스 아님)
 enum EnemyKind: CaseIterable {

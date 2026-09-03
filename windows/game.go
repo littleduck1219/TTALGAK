@@ -110,6 +110,7 @@ type Game struct {
 	hpHurt       bool
 	hitstop      float64
 	shards       []shard
+	diff         difficulty
 }
 
 func NewGame() *Game {
@@ -141,7 +142,7 @@ func (g *Game) theme() color.Color {
 // ── 웨이브 ──
 
 func (g *Game) startWave() {
-	g.toSpawn = waveBaseCount + waveCountGrowth*(g.wave-1)
+	g.toSpawn = maxInt(1, int(float64(waveBaseCount+waveCountGrowth*(g.wave-1))*g.diff.countMul()+0.5))
 	g.spawnTimer = 0.5
 	g.throwTimer = 0.6
 	g.spawnIndex = 0
@@ -196,11 +197,11 @@ func (g *Game) rollKind() enemyKind {
 func (g *Game) spawnEnemy(k enemyKind, offset float64) {
 	w := float64(g.wave - 1)
 	spec := kinds[k]
-	hp := enemyBaseHP * spec.hpMul * (1 + enemyHPGrowth*w) * math.Pow(enemyHPExpo, w)
+	hp := enemyBaseHP * spec.hpMul * (1 + enemyHPGrowth*w) * math.Pow(enemyHPExpo, w) * g.diff.hpMul()
 	e := &enemy{
 		kind: k, hp: hp, maxHP: hp,
 		speed:      enemySpeedBase * spec.speedMul * (1 + enemySpeedGrowth*w),
-		dmg:        enemyDamageBase * spec.dmgMul * (1 + enemyDmgGrowth*w),
+		dmg:        enemyDamageBase * spec.dmgMul * (1 + enemyDmgGrowth*w) * g.diff.dmgMul(),
 		walkPhase:  rand.Float64() * math.Pi * 2,
 		blinkTimer: 1.5 + rand.Float64(),
 	}
@@ -570,6 +571,12 @@ func (g *Game) Update() error {
 			g.requestThrow(gx, gy)
 		}
 	}
+	for key, d := range map[ebiten.Key]difficulty{ebiten.Key1: dEasy, ebiten.Key2: dNormal, ebiten.Key3: dHard} {
+		if inpututil.IsKeyJustPressed(key) && g.diff != d {
+			g.diff = d
+			g.popups = append(g.popups, popup{"난이도: " + d.title(), sceneW / 2, sceneH - 60, 0, 13})
+		}
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		soundOn = !soundOn
 		playSound("card")
@@ -795,7 +802,9 @@ func (g *Game) updateFx() {
 }
 
 func (g *Game) restart() {
+	d := g.diff
 	*g = *NewGame()
+	g.diff = d
 }
 
 // ── 카드 UI 좌표 ──
@@ -970,7 +979,7 @@ func (g *Game) Draw(dst *ebiten.Image) {
 		}
 	case g.state == stGameover:
 		g.drawBox(dst, sceneW/2, sceneH/2+10, 260, 90)
-		drawTextCenter(dst, fmt.Sprintf("GAME OVER — WAVE %d", g.wave), 16, sceneW/2, sceneH/2+18, color.White)
+		drawTextCenter(dst, fmt.Sprintf("GAME OVER — WAVE %d · %s", g.wave, g.diff.title()), 16, sceneW/2, sceneH/2+18, color.White)
 		drawTextCenter(dst, "클릭하면 다시 시작", 12, sceneW/2, sceneH/2-10, translucent(color.White, 0.7))
 	}
 }
