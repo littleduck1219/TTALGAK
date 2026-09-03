@@ -49,6 +49,10 @@ type ringFx struct {
 	x, y, age float64
 }
 
+type shard struct {
+	x, y, vx, vy, rot, age float64
+}
+
 type gameState int
 
 const (
@@ -104,9 +108,14 @@ type Game struct {
 	uniquesTaken map[string]bool
 	waveLblAge   float64
 	hpHurt       bool
+	hitstop      float64
+	shards       []shard
 }
 
 func NewGame() *Game {
+	if len(soundData) == 0 {
+		loadSounds()
+	}
 	g := &Game{uniquesTaken: map[string]bool{}, eliteAt: map[int]enemyKind{}}
 	g.st = newStats()
 	g.wave = 1
@@ -253,6 +262,7 @@ func (g *Game) selectUpgrade(i int) {
 		return
 	}
 	pick := g.cards[i]
+	playSound("card")
 	g.st.apply(pick)
 	if pick.tier == tUnique {
 		g.uniquesTaken[pick.id] = true
@@ -304,6 +314,11 @@ func (g *Game) launchVolley() {
 	}
 	g.throwCount++
 	isPower := g.st.powershotEvery > 0 && g.throwCount%g.st.powershotEvery == 0
+	if isPower {
+		playSound("power")
+	} else {
+		playSound("throw")
+	}
 	hx, hy := g.handPos()
 	offsets := []float64{0, 0.09, -0.09, 0.18, -0.18}
 	for i := 0; i <= g.st.multishot; i++ {
@@ -452,6 +467,14 @@ func (g *Game) damageEnemy(e *enemy, dmg, kb float64, crit bool) {
 	}
 	if e.hp <= 0 {
 		e.dying = true
+		if crit {
+			playSound("crit")
+			g.hitstop = math.Min(0.08, g.hitstop+0.05)
+		} else {
+			playSound("kill")
+			g.hitstop = math.Min(0.08, g.hitstop+0.03)
+		}
+		g.spawnShards(e.x, groundY+kinds[e.kind].hitH*0.5)
 		if g.st.lifesteal > 0 {
 			g.st.hp = math.Min(g.st.maxHP, g.st.hp+g.st.lifesteal)
 		}
@@ -459,11 +482,24 @@ func (g *Game) damageEnemy(e *enemy, dmg, kb float64, crit bool) {
 			g.bumpCombo(e.x, groundY+kinds[e.kind].hitH+8, true)
 		}
 	} else {
+		if crit {
+			playSound("crit")
+		} else {
+			playSound("hit")
+		}
 		dir := 1.0
 		if e.x < g.playerX() {
 			dir = -1
 		}
 		e.x += dir * kb * kinds[e.kind].knockbackMul
+	}
+}
+
+func (g *Game) spawnShards(x, y float64) {
+	for i := 0; i < 5; i++ {
+		a := rand.Float64() * math.Pi * 2
+		sp := 60 + rand.Float64()*80
+		g.shards = append(g.shards, shard{x, y, math.Cos(a) * sp, math.Sin(a)*sp*0.7 + 30, rand.Float64() * math.Pi, 0})
 	}
 }
 
@@ -487,6 +523,7 @@ func (g *Game) playerHit(dmg float64) {
 			}
 			g.popups = append(g.popups, popup{"REVIVE", g.playerX(), groundY + 90, 0, 14})
 		} else {
+			playSound("gameover")
 			g.state = stGameover
 		}
 	}
@@ -533,7 +570,16 @@ func (g *Game) Update() error {
 			g.requestThrow(gx, gy)
 		}
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
+		soundOn = !soundOn
+		playSound("card")
+	}
 	if g.paused {
+		return nil
+	}
+	soundNow += dt
+	if g.hitstop > 0 { // 처치 순간 프레임 정지 (타격감)
+		g.hitstop -= dt
 		return nil
 	}
 
@@ -733,6 +779,19 @@ func (g *Game) updateFx() {
 			g.waveLblAge = 0
 		}
 	}
+	sk := g.shards[:0]
+	for i := range g.shards {
+		sh := &g.shards[i]
+		sh.age += dt
+		sh.vy -= 300 * dt
+		sh.x += sh.vx * dt
+		sh.y += sh.vy * dt
+		sh.rot += 4 * dt
+		if sh.age < 0.4 {
+			sk = append(sk, *sh)
+		}
+	}
+	g.shards = sk
 }
 
 func (g *Game) restart() {
@@ -863,6 +922,10 @@ func (g *Game) Draw(dst *ebiten.Image) {
 	for _, r := range g.rings {
 		t := r.age / 0.35
 		vector.StrokeCircle(dst, float32(r.x), sy(r.y), float32(15+45*t), 2, translucent(th, float32(1-t)), true)
+	}
+	for _, sh := range g.shards {
+		a := float32(math.Max(0, 1-sh.age/0.4))
+		vector.DrawFilledRect(dst, float32(sh.x)-1.6, sy(sh.y)-1.6, 3.2, 3.2, translucent(th, a), true)
 	}
 	for _, p := range g.popups {
 		a := float32(math.Max(0, 1-p.age/0.7))
