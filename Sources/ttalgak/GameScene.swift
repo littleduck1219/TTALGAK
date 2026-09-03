@@ -200,6 +200,14 @@ final class GameScene: SKScene {
     private var uniquesTaken = Set<String>()
     private var throwCount = 0
     private var hitstop: TimeInterval = 0
+    private var fxBudget = 8
+
+    // 이펙트 노드(특히 SKLabelNode)는 생성이 비싸다 — 예산 초과분은 시각만 생략 (데미지는 그대로)
+    private func spendFx() -> Bool {
+        guard fxBudget > 0 else { return false }
+        fxBudget -= 1
+        return true
+    }
 
     private var playerX: CGFloat { mirrored ? size.width - Tuning.playerMargin : Tuning.playerMargin }
 
@@ -387,6 +395,7 @@ final class GameScene: SKScene {
             hitstop -= dt
             return
         }
+        fxBudget = 8   // 프레임당 시각 이펙트 생성 상한 — 멀티샷+폭발+체인 동시 명중 스파이크 방지
 
         player.update(dt: dt)
         updateSpears(dt: dt)
@@ -569,7 +578,8 @@ final class GameScene: SKScene {
 
     // 처치 파티클: 흑백 조각이 튀며 페이드
     private func deathBurst(at p: CGPoint) {
-        for _ in 0 ..< 6 {
+        guard spendFx() else { return }
+        for _ in 0 ..< 5 {
             let shard = SKShapeNode(rectOf: CGSize(width: 3.2, height: 3.2))
             shard.fillColor = themeColor
             shard.strokeColor = .clear
@@ -591,6 +601,7 @@ final class GameScene: SKScene {
     // MARK: - 이펙트
 
     private func popText(_ text: String, at p: CGPoint, size: CGFloat) {
+        guard spendFx() else { return }
         let pop = SKLabelNode(fontNamed: "AvenirNext-Bold")
         pop.text = text
         pop.fontSize = size
@@ -604,6 +615,7 @@ final class GameScene: SKScene {
     }
 
     private func splashRing(at p: CGPoint) {
+        guard spendFx() else { return }
         let ring = SKShapeNode(circleOfRadius: 60)
         ring.strokeColor = themeColor.withAlphaComponent(0.7)
         ring.lineWidth = 2
@@ -615,6 +627,7 @@ final class GameScene: SKScene {
     }
 
     private func chainBolt(from a: CGPoint, to b: CGPoint) {
+        guard spendFx() else { return }
         let path = CGMutablePath()
         path.move(to: a)
         // 지그재그 번개

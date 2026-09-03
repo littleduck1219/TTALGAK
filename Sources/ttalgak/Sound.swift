@@ -10,6 +10,7 @@ final class Sound {
 
     private var pools: [String: [AVAudioPlayer]] = [:]
     private var next: [String: Int] = [:]
+    private var lastPlay: [String: TimeInterval] = [:]
 
     private init() {
         for name in ["throw", "hit", "kill", "crit", "power", "card", "gameover"] {
@@ -30,6 +31,10 @@ final class Sound {
 
     func play(_ name: String) {
         guard enabled, let pool = pools[name], !pool.isEmpty else { return }
+        // 같은 소리의 같은 프레임 다중 호출(멀티샷 동시 명중) 스로틀 — play()는 싸지 않다
+        let now = ProcessInfo.processInfo.systemUptime
+        if let t = lastPlay[name], now - t < 0.04 { return }
+        lastPlay[name] = now
         let i = (next[name] ?? 0) % pool.count
         next[name] = i + 1
         let p = pool[i]
