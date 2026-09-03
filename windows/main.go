@@ -30,9 +30,11 @@ func drawTextCenter(dst *ebiten.Image, s string, size, x, gy float64, col color.
 }
 
 func main() {
+	loadCfg()
+	soundOn = !cfg.Muted
 	for _, arg := range os.Args[1:] {
 		if arg == "-muted" || arg == "--muted" {
-			soundOn = false // 자동 테스트용
+			soundOn = false // 자동 테스트용 (설정 비영속)
 		}
 	}
 	src, err := text.NewGoTextFaceSource(bytes.NewReader(fontBytes))
@@ -50,7 +52,11 @@ func main() {
 	ebiten.SetTPS(60)
 
 	op := &ebiten.RunGameOptions{ScreenTransparent: true}
-	if err := ebiten.RunGameWithOptions(NewGame(), op); err != nil && err != ebiten.Termination {
+	g := NewGame()
+	g.white = cfg.White
+	g.mirrored = cfg.Mirrored
+	g.diff = difficulty(cfg.Diff)
+	if err := ebiten.RunGameWithOptions(g, op); err != nil && err != ebiten.Termination {
 		log.Fatal(err)
 	}
 }

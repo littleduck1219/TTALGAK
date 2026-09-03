@@ -8,6 +8,7 @@ final class Spear: SKNode {
     var damage: CGFloat = 0
     var isPower = false
     var landed = false
+    var didHit = false
     var trailTick = 0
     var hitSet = Set<ObjectIdentifier>()
 
@@ -200,6 +201,13 @@ final class GameScene: SKScene {
     private var uniquesTaken = Set<String>()
     private var throwCount = 0
     private var hitstop: TimeInterval = 0
+    // 런 통계 (게임오버 요약)
+    private var runKills = 0
+    private var runEliteKills = 0
+    private var spearsThrown = 0
+    private var spearsHit = 0
+    private var maxCombo = 0
+    private var cardsTaken = 0
     var difficulty = Difficulty.saved   // 적 스탯 배율 (메뉴/시뮬레이터가 설정)
     private var fxBudget = 8
 
@@ -276,6 +284,7 @@ final class GameScene: SKScene {
         stats = Stats()
         uniquesTaken.removeAll()
         throwCount = 0
+        runKills = 0; runEliteKills = 0; spearsThrown = 0; spearsHit = 0; maxCombo = 0; cardsTaken = 0
         wave = 1
         combo = 0
         hpBar.alpha = 0
@@ -382,6 +391,7 @@ final class GameScene: SKScene {
         s.zRotation = atan2(s.vel.dy, s.vel.dx)
         s.damage = stats.damage * damageMul
         s.pierce = stats.pierce
+        spearsThrown += 1
         addChild(s)
         spears.append(s)
     }
@@ -510,6 +520,7 @@ final class GameScene: SKScene {
     // 콤보 적립. 팝업은 힘 있는 순간(처치, 또는 질풍 연격의 10단위)에만
     private func bumpCombo(at p: CGPoint, showAlways: Bool) {
         combo += 1
+        maxCombo = max(maxCombo, combo)
         comboTimer = Tuning.comboWindow + stats.comboWindowBonus
         if combo >= 2, showAlways || combo % 10 == 0 {
             popText("\(combo) COMBO", at: p, size: 11)
@@ -518,6 +529,7 @@ final class GameScene: SKScene {
 
     // 창 명중: 배율(콤보/브루트/크리) 계산 후 부가 효과(냉기/스플래시/체인) 발동
     private func spearHit(_ s: Spear, _ e: Enemy) {
+        if !s.didHit { s.didHit = true; spearsHit += 1 }
         if stats.hitCombo {   // 질풍 연격: 명중마다 콤보
             bumpCombo(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), showAlways: false)
         }
@@ -560,6 +572,8 @@ final class GameScene: SKScene {
         if e.hp <= 0 {
             e.die()
             enemies.removeAll { $0 === e }
+            runKills += 1
+            if e.kind.isElite { runEliteKills += 1 }
             Sound.shared.play(crit ? "crit" : "kill")
             hitstop = min(0.08, hitstop + (crit ? 0.05 : 0.03))   // 히트스톱
             deathBurst(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH * 0.5))
@@ -770,24 +784,38 @@ final class GameScene: SKScene {
         overlay?.removeFromParent()                // 혹시 남은 오버레이(카드 등) 정리
         let node = SKNode()
         node.zPosition = 50
-        let box = SKShapeNode(rectOf: CGSize(width: 260, height: 90), cornerRadius: 12)
+        // 모드별 최고 기록
+        let bestKey = "best_\(difficulty.rawValue)"
+        let best = UserDefaults.standard.integer(forKey: bestKey)
+        let isRecord = wave > best
+        if isRecord { UserDefaults.standard.set(wave, forKey: bestKey) }
+
+        let accuracy = spearsThrown > 0 ? Int((CGFloat(spearsHit) / CGFloat(spearsThrown) * 100).rounded()) : 0
+        let box = SKShapeNode(rectOf: CGSize(width: 320, height: 150), cornerRadius: 12)
         box.fillColor = SKColor(white: 0.05, alpha: 0.9)
         box.strokeColor = SKColor(white: 1, alpha: 0.6)
-        box.position = CGPoint(x: size.width / 2, y: size.height / 2 + 10)
+        box.position = CGPoint(x: size.width / 2, y: size.height / 2 + 4)
         box.name = "restart"
-        let l1 = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        l1.text = "GAME OVER — WAVE \(wave) · \(difficulty.title)"
-        l1.fontSize = 16
-        l1.position = CGPoint(x: 0, y: 10)
-        l1.name = "restart"
-        box.addChild(l1)
-        let l2 = SKLabelNode(fontNamed: "AvenirNext-Regular")
-        l2.text = "클릭하면 다시 시작"
-        l2.fontSize = 12
-        l2.fontColor = SKColor(white: 1, alpha: 0.7)
-        l2.position = CGPoint(x: 0, y: -18)
-        l2.name = "restart"
-        box.addChild(l2)
+        func line(_ text: String, y: CGFloat, size: CGFloat, bold: Bool = false, alpha: CGFloat = 1) -> SKLabelNode {
+            let l = SKLabelNode(fontNamed: bold ? "AvenirNext-Bold" : "AvenirNext-Regular")
+            l.text = text
+            l.fontSize = size
+            l.fontColor = SKColor(white: 1, alpha: alpha)
+            l.position = CGPoint(x: 0, y: y)
+            l.name = "restart"
+            box.addChild(l)
+            return l
+        }
+        _ = line("GAME OVER — WAVE \(wave) · \(difficulty.title)", y: 48, size: 16, bold: true)
+        if isRecord {
+            let rec = line("★ 신기록! (이전 \(best))", y: 26, size: 13, bold: true)
+            rec.run(.repeatForever(.sequence([.scale(to: 1.12, duration: 0.4), .scale(to: 1.0, duration: 0.4)])))
+        } else {
+            _ = line("최고 기록: WAVE \(best)", y: 26, size: 12, alpha: 0.8)
+        }
+        _ = line("처치 \(runKills)마리 (정예 \(runEliteKills)) · 명중률 \(accuracy)%", y: 2, size: 12, alpha: 0.85)
+        _ = line("최대 콤보 \(maxCombo) · 카드 \(cardsTaken)장", y: -18, size: 12, alpha: 0.85)
+        _ = line("클릭하면 다시 시작", y: -48, size: 11, alpha: 0.6)
         node.addChild(box)
         addChild(node)
         overlay = node
@@ -798,6 +826,7 @@ final class GameScene: SKScene {
         guard state == .choosing, i < pendingUpgrades.count else { return }
         let pick = pendingUpgrades[i]
         Sound.shared.play("card")
+        cardsTaken += 1
         stats.apply(pick)
         if pick.tier == .unique { uniquesTaken.insert(pick.id) }   // 유니크는 1회 한정
         stats.hp = min(stats.maxHP, stats.hp + Tuning.waveClearHeal)   // 클리어 보상 회복

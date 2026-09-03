@@ -30,6 +30,7 @@ type spearShot struct {
 	x, y, vx, vy, damage float64
 	pierce               int
 	power, landed        bool
+	didHit               bool
 	landAge              float64
 	trailTick            int
 	hit                  map[*enemy]bool
@@ -111,6 +112,14 @@ type Game struct {
 	hitstop      float64
 	shards       []shard
 	diff         difficulty
+	runKills     int
+	runElites    int
+	thrown       int
+	hitShots     int
+	maxCombo     int
+	cardsTaken   int
+	newRecord    bool
+	prevBest     int
 }
 
 func NewGame() *Game {
@@ -263,6 +272,7 @@ func (g *Game) selectUpgrade(i int) {
 		return
 	}
 	pick := g.cards[i]
+	g.cardsTaken++
 	playSound("card")
 	g.st.apply(pick)
 	if pick.tier == tUnique {
@@ -352,6 +362,7 @@ func (g *Game) fire(px, py, angleOffset, damageMul float64, power bool) {
 		damage: g.st.damage * damageMul, pierce: g.st.pierce,
 		power: power, hit: map[*enemy]bool{},
 	}
+	g.thrown++
 	g.spears = append(g.spears, sp)
 }
 
@@ -406,6 +417,9 @@ func (g *Game) handPos() (float64, float64) {
 
 func (g *Game) bumpCombo(x, y float64, showAlways bool) {
 	g.combo++
+	if g.combo > g.maxCombo {
+		g.maxCombo = g.combo
+	}
 	g.comboTimer = comboWindow + g.st.comboWindowBonus
 	if g.combo >= 2 && (showAlways || g.combo%10 == 0) {
 		g.popups = append(g.popups, popup{fmt.Sprintf("%d COMBO", g.combo), x, y, 0, 11})
@@ -413,6 +427,10 @@ func (g *Game) bumpCombo(x, y float64, showAlways bool) {
 }
 
 func (g *Game) spearHit(s *spearShot, e *enemy) {
+	if !s.didHit {
+		s.didHit = true
+		g.hitShots++
+	}
 	if g.st.hitCombo {
 		g.bumpCombo(e.x, groundY+kinds[e.kind].hitH+8, false)
 	}
@@ -468,6 +486,10 @@ func (g *Game) damageEnemy(e *enemy, dmg, kb float64, crit bool) {
 	}
 	if e.hp <= 0 {
 		e.dying = true
+		g.runKills++
+		if kinds[e.kind].elite {
+			g.runElites++
+		}
 		if crit {
 			playSound("crit")
 			g.hitstop = math.Min(0.08, g.hitstop+0.05)
@@ -526,6 +548,12 @@ func (g *Game) playerHit(dmg float64) {
 		} else {
 			playSound("gameover")
 			g.state = stGameover
+			g.prevBest = cfg.Best[g.diff.key()]
+			if g.wave > g.prevBest {
+				g.newRecord = true
+				cfg.Best[g.diff.key()] = g.wave
+				saveCfg()
+			}
 		}
 	}
 }
@@ -541,6 +569,8 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		cfg.Mirrored = !cfg.Mirrored
+		saveCfg()
 		g.mirrored = !g.mirrored
 		for _, e := range g.enemies {
 			e.x = sceneW - e.x
@@ -549,6 +579,8 @@ func (g *Game) Update() error {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) {
 		g.white = !g.white
+		cfg.White = g.white
+		saveCfg()
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		g.restart()
@@ -574,11 +606,15 @@ func (g *Game) Update() error {
 	for key, d := range map[ebiten.Key]difficulty{ebiten.Key1: dEasy, ebiten.Key2: dNormal, ebiten.Key3: dHard} {
 		if inpututil.IsKeyJustPressed(key) && g.diff != d {
 			g.diff = d
+			cfg.Diff = int(d)
+			saveCfg()
 			g.popups = append(g.popups, popup{"난이도: " + d.title(), sceneW / 2, sceneH - 60, 0, 13})
 		}
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		soundOn = !soundOn
+		cfg.Muted = !soundOn
+		saveCfg()
 		playSound("card")
 	}
 	if g.paused {
@@ -802,9 +838,9 @@ func (g *Game) updateFx() {
 }
 
 func (g *Game) restart() {
-	d := g.diff
+	d, w, m := g.diff, g.white, g.mirrored
 	*g = *NewGame()
-	g.diff = d
+	g.diff, g.white, g.mirrored = d, w, m
 }
 
 // ── 카드 UI 좌표 ──
@@ -979,7 +1015,18 @@ func (g *Game) Draw(dst *ebiten.Image) {
 		}
 	case g.state == stGameover:
 		g.drawBox(dst, sceneW/2, sceneH/2+10, 260, 90)
-		drawTextCenter(dst, fmt.Sprintf("GAME OVER — WAVE %d · %s", g.wave, g.diff.title()), 16, sceneW/2, sceneH/2+18, color.White)
+		acc := 0
+		if g.thrown > 0 {
+			acc = int(float64(g.hitShots)/float64(g.thrown)*100 + 0.5)
+		}
+		drawTextCenter(dst, fmt.Sprintf("GAME OVER — WAVE %d · %s", g.wave, g.diff.title()), 16, sceneW/2, sceneH/2+52, color.White)
+		if g.newRecord {
+			drawTextCenter(dst, fmt.Sprintf("★ 신기록! (이전 %d)", g.prevBest), 13, sceneW/2, sceneH/2+30, color.White)
+		} else {
+			drawTextCenter(dst, fmt.Sprintf("최고 기록: WAVE %d", g.prevBest), 12, sceneW/2, sceneH/2+30, translucent(color.White, 0.8))
+		}
+		drawTextCenter(dst, fmt.Sprintf("처치 %d마리 (정예 %d) · 명중률 %d%%", g.runKills, g.runElites, acc), 12, sceneW/2, sceneH/2+6, translucent(color.White, 0.85))
+		drawTextCenter(dst, fmt.Sprintf("최대 콤보 %d · 카드 %d장", g.maxCombo, g.cardsTaken), 12, sceneW/2, sceneH/2-14, translucent(color.White, 0.85))
 		drawTextCenter(dst, "클릭하면 다시 시작", 12, sceneW/2, sceneH/2-10, translucent(color.White, 0.7))
 	}
 }
