@@ -467,6 +467,8 @@ func drawCreature(f *frame, k enemyKind, phase, atk float64) {
 		drawReaper(f, phase, atk)
 	case kJugger:
 		drawJugger(f, phase, atk)
+	case kBoss:
+		drawColossus(f, phase, atk)
 	}
 }
 
@@ -514,4 +516,48 @@ func drawSpear(dst *ebiten.Image, x, y, rot float64, power bool, col color.Color
 		tip.Close()
 		f.fill(tip)
 	}
+}
+
+
+// ── 콜로서스 (보스): 뿔투구 거대 골렘, 키 ~150 ──
+
+func drawColossus(f *frame, phase, atk float64) {
+	oy := 2.0 * math.Abs(math.Sin(phase))
+	armA := -1.4 + 0.09*math.Sin(phase)*btoi(atk == 0)
+	flex := 0.2
+	if atk > 0 {
+		armA = -1.4 + 2.3*atk
+		flex = 0.2 - 0.3*atk
+	}
+	// 몸통 슬랩 + 투구 + 뿔
+	torso := &vector.Path{}
+	poly := func(pts [][2]float64) {
+		x0, y0 := f.pt(pts[0][0], pts[0][1]+oy)
+		torso.MoveTo(x0, y0)
+		for _, q := range pts[1:] {
+			x, y := f.pt(q[0], q[1]+oy)
+			torso.LineTo(x, y)
+		}
+		torso.Close()
+	}
+	poly([][2]float64{{-22, 52}, {-40, 128}, {40, 128}, {22, 52}})
+	poly([][2]float64{{-12, 128}, {-9, 150}, {9, 150}, {12, 128}})
+	poly([][2]float64{{-9, 148}, {-17, 164}, {-4, 152}})
+	poly([][2]float64{{9, 148}, {17, 164}, {4, 152}})
+	f.fill(torso)
+	// 팔 + 주먹
+	arm := func(rx, ry, l1, l2, ang, fl, w float64) {
+		p := &vector.Path{}
+		ex, ey, _ := f.limb(p, rx, ry+oy, l1, l2, ang, fl)
+		f.stroke(p, w)
+		f.circle(ex, ey, w+1.5)
+	}
+	arm(-36, 120, 40, 36, armA-0.25, flex, 10)
+	arm(38, 120, 42, 38, armA, flex, 11)
+	// 기둥 다리
+	legs := &vector.Path{}
+	s := math.Sin(phase)
+	f.line(legs, 16, 54+oy, 16+12*math.Sin(0.22*s), 0)
+	f.line(legs, -16, 54+oy, -16-12*math.Sin(0.22*s), 0)
+	f.stroke(legs, 9)
 }

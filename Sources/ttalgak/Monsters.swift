@@ -15,6 +15,7 @@ extension EnemyKind {
         case .wyvern: return WyvernFigure(color: color, lineWidth: lineWidth)
         case .reaper: return ReaperFigure(color: color, lineWidth: lineWidth)
         case .juggernaut: return JuggernautFigure(color: color, lineWidth: lineWidth)
+        case .boss: return ColossusFigure(color: color, lineWidth: lineWidth)
         }
     }
 }
@@ -476,4 +477,104 @@ final class JuggernautFigure: SKNode, CreatureFigure {
 
 private extension SKShapeNode {
     func with(path p: CGPath) -> SKShapeNode { self.path = p; return self }
+}
+
+
+// MARK: - 콜로서스 (보스): 뿔투구 거대 골렘, 페이즈제. 키 ~150
+
+final class ColossusFigure: SKNode, CreatureFigure {
+    private let body = SKNode()
+    private let armF: SKShapeNode, armB: SKShapeNode
+    private let fistF: SKShapeNode, fistB: SKShapeNode
+    private let legF: SKShapeNode, legB: SKShapeNode
+
+    init(color: SKColor, lineWidth: CGFloat) {
+        armF = makeShape(color, 11, z: 3)
+        armB = makeShape(color, 10, z: 2)
+        fistF = makeShape(color, 1, z: 3, fill: true)
+        fistB = makeShape(color, 1, z: 2, fill: true)
+        legF = makeShape(color, 9, z: 1)
+        legB = makeShape(color, 9, z: -1)
+        super.init()
+        addChild(body)
+
+        // 어깨가 넓고 허리가 좁은 거대한 슬랩 몸통 + 뿔투구
+        let torso = makeShape(color, lineWidth * 0.5, fill: true)
+        torso.path = {
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: -22, y: 52))
+            p.addLine(to: CGPoint(x: -40, y: 128))
+            p.addLine(to: CGPoint(x: 40, y: 128))
+            p.addLine(to: CGPoint(x: 22, y: 52))
+            p.closeSubpath()
+            // 투구 (몸통 위 사다리꼴)
+            p.move(to: CGPoint(x: -12, y: 128))
+            p.addLine(to: CGPoint(x: -9, y: 150))
+            p.addLine(to: CGPoint(x: 9, y: 150))
+            p.addLine(to: CGPoint(x: 12, y: 128))
+            p.closeSubpath()
+            // 뿔 2개
+            p.move(to: CGPoint(x: -9, y: 148))
+            p.addLine(to: CGPoint(x: -17, y: 164))
+            p.addLine(to: CGPoint(x: -4, y: 152))
+            p.closeSubpath()
+            p.move(to: CGPoint(x: 9, y: 148))
+            p.addLine(to: CGPoint(x: 17, y: 164))
+            p.addLine(to: CGPoint(x: 4, y: 152))
+            p.closeSubpath()
+            return p
+        }()
+        body.addChild(torso)
+        body.addChild(armF)
+        body.addChild(armB)
+        body.addChild(fistF)
+        body.addChild(fistB)
+        addChild(legF)
+        addChild(legB)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func arms(angle: CGFloat, flex: CGFloat, sway: CGFloat) {
+        let f = armPath(armF, from: CGPoint(x: 38, y: 120), len1: 42, len2: 38, angle: angle + sway, flex: flex)
+        fistF.path = CGPath(ellipseIn: CGRect(x: f.x - 12, y: f.y - 12, width: 24, height: 24), transform: nil)
+        let b = armPath(armB, from: CGPoint(x: -36, y: 120), len1: 40, len2: 36, angle: angle - sway - 0.25, flex: flex)
+        fistB.path = CGPath(ellipseIn: CGRect(x: b.x - 11, y: b.y - 11, width: 22, height: 22), transform: nil)
+    }
+
+    private func armPath(_ shape: SKShapeNode, from root: CGPoint,
+                         len1: CGFloat, len2: CGFloat, angle: CGFloat, flex: CGFloat) -> CGPoint {
+        let mid = CGPoint(x: root.x + cos(angle) * len1, y: root.y + sin(angle) * len1)
+        let end = CGPoint(x: mid.x + cos(angle + flex) * len2, y: mid.y + sin(angle + flex) * len2)
+        let p = CGMutablePath()
+        p.move(to: root)
+        p.addQuadCurve(to: end, control: CGPoint(x: 2 * mid.x - (root.x + end.x) / 2,
+                                                 y: 2 * mid.y - (root.y + end.y) / 2))
+        shape.path = p
+        return end
+    }
+
+    func animate(phase: CGFloat) {
+        body.zRotation = 0.025 * sin(phase)
+        body.position.y = 2.0 * abs(sin(phase))
+        arms(angle: -1.4, flex: 0.2, sway: 0.09 * sin(phase))
+        let s = sin(phase)
+        // 기둥 다리: 느린 스톰프 스윙
+        legF.path = {
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: 16, y: 54))
+            p.addLine(to: CGPoint(x: 16 + 12 * sin(0.22 * s), y: 0))
+            return p
+        }()
+        legB.path = {
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: -16, y: 54))
+            p.addLine(to: CGPoint(x: -16 - 12 * sin(0.22 * s), y: 0))
+            return p
+        }()
+    }
+
+    func attack(_ s: CGFloat) {
+        body.zRotation = -0.04 * s
+        arms(angle: -1.4 + 2.3 * s, flex: 0.2 - 0.3 * s, sway: 0)   // 양 주먹 들어 내려찍기
+    }
 }

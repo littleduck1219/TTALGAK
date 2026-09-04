@@ -23,6 +23,8 @@ type enemy struct {
 	chillTimer, blinkTimer  float64
 	atkSwing                float64 // 표시용 공격 스윙 0..1
 	inMelee, dying          bool
+	bossPhase               int
+	bossSummonT             float64
 	deathAge, facing        float64
 }
 
@@ -120,6 +122,8 @@ type Game struct {
 	cardsTaken   int
 	newRecord    bool
 	prevBest     int
+	isBossWave   bool
+	bossReward   bool
 }
 
 func NewGame() *Game {
@@ -151,12 +155,21 @@ func (g *Game) theme() color.Color {
 // ── 웨이브 ──
 
 func (g *Game) startWave() {
-	g.toSpawn = maxInt(1, int(float64(waveBaseCount+waveCountGrowth*(g.wave-1))*g.diff.countMul()+0.5))
+	g.isBossWave = g.wave%bossEvery == 0
+	if g.isBossWave {
+		g.toSpawn = 1
+	} else {
+		g.toSpawn = maxInt(1, int(float64(waveBaseCount+waveCountGrowth*(g.wave-1))*g.diff.countMul()+0.5))
+	}
 	g.spawnTimer = 0.5
 	g.throwTimer = 0.6
 	g.spawnIndex = 0
 	g.waveLblAge = 0.0001
 	g.eliteAt = map[int]enemyKind{}
+	if g.isBossWave {
+		g.eliteAt[0] = kBoss
+		return
+	}
 	if g.wave >= 6 {
 		var unlocked []enemyKind
 		for _, k := range []enemyKind{kWyvern, kReaper, kJugger} {
@@ -213,6 +226,8 @@ func (g *Game) spawnEnemy(k enemyKind, offset float64) {
 		dmg:        enemyDamageBase * spec.dmgMul * (1 + enemyDmgGrowth*w) * g.diff.dmgMul(),
 		walkPhase:  rand.Float64() * math.Pi * 2,
 		blinkTimer: 1.5 + rand.Float64(),
+		bossSummonT: 3.0,
+		bossPhase:  1,
 	}
 	if g.mirrored {
 		e.x = -30 - offset
@@ -231,7 +246,8 @@ func (g *Game) rollCards() []upgradeDef {
 	if g.wave >= 5 {
 		uniqueP = math.Min(0.15, 0.07+0.01*float64(g.wave-4))
 	}
-	forceUnique := g.wave >= 5 && len(g.uniquesTaken) == 0
+	forceUnique := g.bossReward || (g.wave >= 5 && len(g.uniquesTaken) == 0)
+	g.bossReward = false
 	candidates := func(t tier) []upgradeDef {
 		var c []upgradeDef
 		for _, u := range upgradePool {
@@ -435,7 +451,7 @@ func (g *Game) spearHit(s *spearShot, e *enemy) {
 		g.bumpCombo(e.x, groundY+kinds[e.kind].hitH+8, false)
 	}
 	dmg := s.damage * (1 + math.Min(0.3, float64(g.combo)*g.st.comboDmgPer))
-	if e.kind == kBrute || e.kind == kJugger {
+	if e.kind == kBrute || e.kind == kJugger || e.kind == kBoss {
 		dmg *= g.st.bruteMul
 	}
 	crit := false
@@ -478,7 +494,7 @@ func (g *Game) damageEnemy(e *enemy, dmg, kb float64, crit bool) {
 		return
 	}
 	e.hp -= dmg
-	if e.hp > 0 && g.st.executeAt > 0 && e.hp <= e.maxHP*g.st.executeAt {
+	if e.hp > 0 && g.st.executeAt > 0 && e.kind != kBoss && e.hp <= e.maxHP*g.st.executeAt {
 		e.hp = 0
 	}
 	if crit {
@@ -486,6 +502,11 @@ func (g *Game) damageEnemy(e *enemy, dmg, kb float64, crit bool) {
 	}
 	if e.hp <= 0 {
 		e.dying = true
+		if e.kind == kBoss {
+			g.bossReward = true
+			g.hitstop = 0.12
+			g.popups = append(g.popups, popup{"BOSS DOWN", e.x, groundY + 120, 0, 16})
+		}
 		g.runKills++
 		if kinds[e.kind].elite {
 			g.runElites++
@@ -659,6 +680,9 @@ func (g *Game) Update() error {
 	px := g.playerX()
 	alive := g.enemies[:0]
 	for _, e := range g.enemies {
+		if e.kind == kBoss && !e.dying {
+			g.updateBoss(e)
+		}
 		if e.dying {
 			e.deathAge += dt
 			if e.deathAge < 0.9 {
@@ -681,6 +705,9 @@ func (g *Game) Update() error {
 			e.attackTimer -= dt
 			if e.attackTimer <= 0 {
 				e.attackTimer = enemyAttackInterval
+				if e.kind == kBoss {
+					e.attackTimer = bossAttackInterval
+				}
 				g.playerHit(e.dmg)
 			}
 		} else {
@@ -688,6 +715,9 @@ func (g *Game) Update() error {
 			mul := g.st.globalSlow
 			if e.chillTimer > 0 {
 				mul *= 0.7
+			}
+			if e.kind == kBoss && e.bossPhase >= 3 {
+				mul *= 1.7
 			}
 			e.walkPhase += dt * spec.gaitFreq * mul
 			e.x += facing * e.speed * mul * dt
@@ -837,6 +867,40 @@ func (g *Game) updateFx() {
 	g.shards = sk
 }
 
+// 보스 페이즈: 1(60%+) 평이동 / 2(60%↓) 부하 소환 / 3(30%↓) 광폭화
+func (g *Game) updateBoss(e *enemy) {
+	frac := e.hp / e.maxHP
+	phase := 1
+	if frac <= 0.3 {
+		phase = 3
+	} else if frac <= 0.6 {
+		phase = 2
+	}
+	if phase >= 3 && e.bossPhase < 3 {
+		e.dmg *= 1.5
+		g.popups = append(g.popups, popup{"광폭화!", e.x, groundY + 165, 0, 13})
+		playSound("power")
+	}
+	e.bossPhase = phase
+	if phase >= 2 {
+		rate := 1.0
+		if phase == 3 {
+			rate = 1.6
+		}
+		e.bossSummonT -= dt * rate
+		if e.bossSummonT <= 0 {
+			e.bossSummonT = bossSummonInterval
+			k := kGrunt
+			if rand.Float64() < 0.5 {
+				k = kRunner
+			}
+			g.spawnEnemy(k, 0)
+			g.spawnEnemy(k, 30)
+			g.popups = append(g.popups, popup{"소환", e.x, groundY + 160, 0, 11})
+		}
+	}
+}
+
 func (g *Game) restart() {
 	d, w, m := g.diff, g.white, g.mirrored
 	*g = *NewGame()
@@ -975,6 +1039,18 @@ func (g *Game) Draw(dst *ebiten.Image) {
 	for _, p := range g.popups {
 		a := float32(math.Max(0, 1-p.age/0.7))
 		drawTextCenter(dst, p.text, p.size, p.x, p.y+26*p.age/0.7, translucent(th, a))
+	}
+
+	// 보스 체력바
+	for _, e := range g.enemies {
+		if e.kind == kBoss && !e.dying {
+			frac := math.Max(0, e.hp/e.maxHP)
+			bx, by := float32(sceneW/2-182), sy(sceneH-10)
+			vector.DrawFilledRect(dst, bx, by, 364, 8, color.RGBA{13, 13, 13, 165}, true)
+			vector.StrokeRect(dst, bx, by, 364, 8, 1, translucent(th, 0.7), true)
+			vector.DrawFilledRect(dst, bx+2, by+1.6, float32(360*frac), 4.8, color.White, true)
+			break
+		}
 	}
 
 	// 웨이브 라벨

@@ -78,6 +78,8 @@ final class Enemy: SKNode {
     var chillTimer: TimeInterval = 0
     var blinkTimer: TimeInterval = .random(in: 1.5 ... 2.5)   // 리퍼 순간이동 주기
     var inMelee = false   // 근접 공격 중 (와이번은 급강하로 낮아지므로 명중 하한 해제)
+    var bossPhase = 1
+    var bossSummonTimer: TimeInterval = 3.0
     var dying = false
     private var poseAccum: TimeInterval = 0   // 포즈 리샘플 스로틀 (이동은 60fps, 포즈는 30fps)
     private let chillMark: SKShapeNode = {   // 슬로우 표시: 머리 위 눈꽃(*)
@@ -201,6 +203,10 @@ final class GameScene: SKScene {
     private var uniquesTaken = Set<String>()
     private var throwCount = 0
     private var hitstop: TimeInterval = 0
+    private var isBossWave = false
+    private var bossRewardPending = false
+    private var bossBar: SKSpriteNode?
+    private var bossBarBG: SKShapeNode?
     // 런 통계 (게임오버 요약)
     private var runKills = 0
     private var runEliteKills = 0
@@ -285,6 +291,8 @@ final class GameScene: SKScene {
         uniquesTaken.removeAll()
         throwCount = 0
         runKills = 0; runEliteKills = 0; spearsThrown = 0; spearsHit = 0; maxCombo = 0; cardsTaken = 0
+        bossRewardPending = false
+        removeBossBar()
         wave = 1
         combo = 0
         hpBar.alpha = 0
@@ -296,13 +304,20 @@ final class GameScene: SKScene {
     // MARK: - 웨이브
 
     private func startWave() {
-        toSpawn = max(1, Int((CGFloat(Tuning.waveBaseCount + Tuning.waveCountGrowth * (wave - 1)) * difficulty.countMul).rounded()))
+        isBossWave = wave % Tuning.bossEvery == 0
+        if isBossWave {
+            toSpawn = 1   // 보스 1마리 (부하는 보스가 소환)
+        } else {
+            toSpawn = max(1, Int((CGFloat(Tuning.waveBaseCount + Tuning.waveCountGrowth * (wave - 1)) * difficulty.countMul).rounded()))
+        }
         spawnTimer = 0.5
         throwTimer = 0.6
         spawnIndex = 0
         // 정예 편성: 웨이브 5+ 1마리, 9+ 2마리. 스폰 순번 중간 이후 랜덤 슬롯에 배치
         eliteAt = [:]
-        if wave >= 6 {
+        if isBossWave {
+            eliteAt[0] = .boss
+        } else if wave >= 6 {
             let unlocked = EnemyKind.allCases.filter { $0.isElite && wave >= $0.unlockWave }
             let count = min(4, 1 + (wave - 6) / 5)   // w6:1, w11:2, w16:3, w21+:4
             var slots = Array(1 ..< toSpawn).shuffled()
@@ -433,12 +448,14 @@ final class GameScene: SKScene {
 
         // 적
         for e in enemies where !e.dying {
+            if e.kind == .boss { updateBoss(e, dt: dt) }
             let inRange = abs(e.position.x - playerX) < 34 + e.hitHalfW   // 몸집만큼 간격을 두고 정지
-            e.update(dt: dt, playerX: playerX, inRange: inRange, speedMul: stats.globalSlow)
+            let bossRage: CGFloat = (e.kind == .boss && e.bossPhase >= 3) ? 1.7 : 1
+            e.update(dt: dt, playerX: playerX, inRange: inRange, speedMul: stats.globalSlow * bossRage)
             if inRange {
                 e.attackTimer -= dt
                 if e.attackTimer <= 0 {
-                    e.attackTimer = Tuning.enemyAttackInterval
+                    e.attackTimer = e.kind == .boss ? Tuning.bossAttackInterval : Tuning.enemyAttackInterval
                     playerHit(e.damage)
                 }
             }
@@ -534,7 +551,7 @@ final class GameScene: SKScene {
             bumpCombo(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 8), showAlways: false)
         }
         var dmg = s.damage * (1 + min(0.3, CGFloat(combo) * stats.comboDmgPer))
-        if e.kind == .brute || e.kind == .juggernaut { dmg *= stats.bruteMul }   // 거인 사냥꾼
+        if e.kind == .brute || e.kind == .juggernaut || e.kind == .boss { dmg *= stats.bruteMul }   // 거인 사냥꾼
         var crit = false
         if stats.critChance > 0, CGFloat.random(in: 0 ..< 1) < stats.critChance {
             dmg *= stats.critMul
@@ -563,8 +580,8 @@ final class GameScene: SKScene {
     private func damageEnemy(_ e: Enemy, _ dmg: CGFloat, knockback: CGFloat, crit: Bool) {
         guard !e.dying else { return }
         e.hp -= dmg
-        if e.hp > 0, stats.executeAt > 0, e.hp <= e.maxHP * stats.executeAt {
-            e.hp = 0   // 처형자
+        if e.hp > 0, stats.executeAt > 0, e.kind != .boss, e.hp <= e.maxHP * stats.executeAt {
+            e.hp = 0   // 처형자 (보스 면역)
         }
         if crit {
             popText("CRIT", at: CGPoint(x: e.position.x, y: e.position.y + e.hitH + 22), size: 13)
@@ -574,6 +591,12 @@ final class GameScene: SKScene {
             enemies.removeAll { $0 === e }
             runKills += 1
             if e.kind.isElite { runEliteKills += 1 }
+            if e.kind == .boss {
+                bossRewardPending = true
+                removeBossBar()
+                hitstop = 0.12
+                popText("BOSS DOWN", at: CGPoint(x: e.position.x, y: groundY + 120), size: 16)
+            }
             Sound.shared.play(crit ? "crit" : "kill")
             hitstop = min(0.08, hitstop + (crit ? 0.05 : 0.03))   // 히트스톱
             deathBurst(at: CGPoint(x: e.position.x, y: e.position.y + e.hitH * 0.5))
@@ -686,7 +709,8 @@ final class GameScene: SKScene {
         var used = Set<String>()
         let uniqueP = wave >= 5 ? min(0.15, 0.07 + 0.01 * Double(wave - 4)) : 0.07
         let hasUniqueLeft = Upgrades.pool.contains { $0.tier == .unique && !uniquesTaken.contains($0.id) }
-        let forceUnique = wave >= 5 && uniquesTaken.isEmpty && hasUniqueLeft
+        let forceUnique = bossRewardPending || (wave >= 5 && uniquesTaken.isEmpty)
+        bossRewardPending = false && hasUniqueLeft
         for i in 0 ..< 3 {
             let r = Double.random(in: 0 ..< 1)
             let tier: Tier = (i == 0 && forceUnique) ? .unique
@@ -820,6 +844,51 @@ final class GameScene: SKScene {
         addChild(node)
         overlay = node
         onInteractive?(true)
+    }
+
+    // 보스 페이즈: 1(60%+) 평이동 / 2(60%↓) 부하 소환 / 3(30%↓) 광폭화(+소환 가속)
+    private func updateBoss(_ e: Enemy, dt: TimeInterval) {
+        let frac = e.hp / e.maxHP
+        let phase = frac > 0.6 ? 1 : (frac > 0.3 ? 2 : 3)
+        if phase >= 3, e.bossPhase < 3 {
+            e.damage *= 1.5
+            popText("광폭화!", at: CGPoint(x: e.position.x, y: groundY + 165), size: 13)
+            Sound.shared.play("power")
+        }
+        e.bossPhase = phase
+        if phase >= 2 {
+            e.bossSummonTimer -= dt * (phase == 3 ? 1.6 : 1.0)
+            if e.bossSummonTimer <= 0 {
+                e.bossSummonTimer = Tuning.bossSummonInterval
+                let kind: EnemyKind = Bool.random() ? .grunt : .runner
+                spawnEnemy(kind)
+                spawnEnemy(kind, offset: 30)
+                popText("소환", at: CGPoint(x: e.position.x, y: groundY + 160), size: 11)
+            }
+        }
+        // 전용 체력바
+        if bossBar == nil {
+            let bg = SKShapeNode(rectOf: CGSize(width: 364, height: 8), cornerRadius: 4)
+            bg.fillColor = SKColor(white: 0.05, alpha: 0.65)
+            bg.strokeColor = themeColor.withAlphaComponent(0.7)
+            bg.lineWidth = 1
+            bg.position = CGPoint(x: size.width / 2, y: size.height - 16)
+            bg.zPosition = 60
+            addChild(bg)
+            bossBarBG = bg
+            let bar = SKSpriteNode(color: .white, size: CGSize(width: 358, height: 4.5))
+            bar.anchorPoint = CGPoint(x: 0, y: 0.5)
+            bar.position = CGPoint(x: size.width / 2 - 179, y: size.height - 16)
+            bar.zPosition = 61
+            addChild(bar)
+            bossBar = bar
+        }
+        bossBar?.xScale = max(0, frac)
+    }
+
+    private func removeBossBar() {
+        bossBar?.removeFromParent(); bossBar = nil
+        bossBarBG?.removeFromParent(); bossBarBG = nil
     }
 
     private func selectUpgrade(_ i: Int) {

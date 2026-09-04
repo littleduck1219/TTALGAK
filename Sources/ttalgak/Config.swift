@@ -33,6 +33,11 @@ enum Tuning {
     static let spawnIntervalMin: TimeInterval = 0.35   // 스폰 간격 불규칙 범위
     static let spawnIntervalMax: TimeInterval = 1.7    // 웨이브당 -0.05씩 조여짐 (하한 0.5)
 
+    // 보스 (10웨이브마다)
+    static let bossEvery = 10
+    static let bossSummonInterval: TimeInterval = 4.5   // 페이즈2 소환 주기 (페이즈3은 ×0.6)
+    static let bossAttackInterval: TimeInterval = 1.4
+
     // 콤보
     static let comboWindow: TimeInterval = 3.0
 
@@ -71,6 +76,7 @@ enum EnemyKind: CaseIterable {
     case wyvern      // 와이번: 공중 비행 — 높은 조준 강제, 급강하 공격
     case reaper      // 리퍼: 낫 든 그림자 — 주기적 순간이동 전진
     case juggernaut  // 저거너트: 각진 장갑 덩치 — 넉백 면역급, 최고 체력
+    case boss        // 콜로서스: 10웨이브마다 등장하는 보스 (페이즈제)
 
     var isElite: Bool {
         switch self { case .wyvern, .reaper, .juggernaut: return true; default: return false }
@@ -79,55 +85,63 @@ enum EnemyKind: CaseIterable {
         switch self {
         case .grunt: 1; case .runner: 2; case .brute: 4
         case .wyvern: 6; case .reaper: 7; case .juggernaut: 9
+        case .boss: 999   // 일반 롤에 등장하지 않음 (보스 웨이브 전용)
         }
     }
     var hpMul: CGFloat {
         switch self {
         case .grunt: 1.0; case .runner: 0.45; case .brute: 3.5
         case .wyvern: 1.8; case .reaper: 4.0; case .juggernaut: 6.5
+        case .boss: 20.0
         }
     }
     var speedMul: CGFloat {
         switch self {
         case .grunt: 1.0; case .runner: 2.3; case .brute: 0.55
         case .wyvern: 1.25; case .reaper: 0.95; case .juggernaut: 0.42
+        case .boss: 0.5
         }
     }
     var dmgMul: CGFloat {
         switch self {
         case .grunt: 1.0; case .runner: 0.7; case .brute: 2.2
         case .wyvern: 1.5; case .reaper: 2.5; case .juggernaut: 3.2
+        case .boss: 4.0
         }
     }
     var lineWidth: CGFloat {
         switch self {
         case .grunt: 3.2; case .runner: 3.2; case .brute: 5.5
         case .wyvern: 3.0; case .reaper: 3.4; case .juggernaut: 5.0
+        case .boss: 6.5
         }
     }
     var gaitFreq: CGFloat {
         switch self {
         case .grunt: 6.5; case .runner: 9.5; case .brute: 4.2
         case .wyvern: 9.0; case .reaper: 5.0; case .juggernaut: 3.5
+        case .boss: 2.8
         }
     }
     var hitHalfW: CGFloat {
         switch self {
         case .grunt: 14; case .runner: 18; case .brute: 19
         case .wyvern: 20; case .reaper: 13; case .juggernaut: 22
+        case .boss: 34
         }
     }
     var hitH: CGFloat {
         switch self {
         case .grunt: 48; case .runner: 34; case .brute: 70
         case .wyvern: 100; case .reaper: 62; case .juggernaut: 76
+        case .boss: 150
         }
     }
     // 명중 박스 하한 (지면 기준) — 와이번은 공중이라 낮은 창은 밑으로 지나감
     var hitYMin: CGFloat { self == .wyvern ? 40 : 0 }
     // 넉백 저항 (0 = 면역)
     var knockbackMul: CGFloat {
-        switch self { case .juggernaut: 0.15; case .reaper: 0.8; default: 1.0 }
+        switch self { case .juggernaut: 0.15; case .reaper: 0.8; case .boss: 0; default: 1.0 }
     }
 }
 

@@ -75,7 +75,7 @@ if let idx = CommandLine.arguments.firstIndex(of: "--snapshot") {
     // 크리처 라인업 검증 샷 (하급 3 + 정예 3)
     let lineup: [any CreatureFigure] = EnemyKind.allCases.map { $0.makeFigure(color: .black) }
     for (i, f) in lineup.enumerated() {
-        f.position = CGPoint(x: 210 + CGFloat(i) * 125, y: 26)
+        f.position = CGPoint(x: 150 + CGFloat(i) * 115, y: 26)
         f.animate(phase: 1.2)
         scene.addChild(f)
     }

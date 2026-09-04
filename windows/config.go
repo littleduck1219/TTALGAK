@@ -28,6 +28,10 @@ const (
 	spawnIntervalMin    = 0.35
 	spawnIntervalMax    = 1.7
 
+	bossEvery          = 10
+	bossSummonInterval = 4.5
+	bossAttackInterval = 1.4
+
 	comboWindow   = 3.0
 	waveClearHeal = 22.0
 
@@ -93,6 +97,7 @@ const (
 	kWyvern                 // 와이번 (정예, 공중)
 	kReaper                 // 리퍼 (정예, 순간이동)
 	kJugger                 // 저거너트 (정예, 넉백 면역)
+	kBoss                   // 콜로서스 (보스, 10웨이브마다)
 )
 
 type kindSpec struct {
@@ -111,6 +116,7 @@ var kinds = map[enemyKind]kindSpec{
 	kWyvern: {1.8, 1.25, 1.5, 3.0, 9.0, 20, 100, enemyHitYMinWyvern, 1.0, 6, true},
 	kReaper: {4.0, 0.95, 2.5, 3.4, 5.0, 13, 62, 0, 0.8, 7, true},
 	kJugger: {6.5, 0.42, 3.2, 5.0, 3.5, 22, 76, 0, 0.15, 9, true},
+	kBoss:   {20.0, 0.5, 4.0, 6.5, 2.8, 34, 150, 0, 0, 999, false},
 }
 
 // ── 업그레이드 (등급제) ──
